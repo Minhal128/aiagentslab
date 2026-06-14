@@ -43,6 +43,7 @@ if (process.env.NODE_ENV === "production"
 const child = spawn("npx", ["drizzle-kit", "push", "--force"], {
   stdio: ["pipe", "pipe", "inherit"],
   env: { ...process.env, FORCE_COLOR: "0" },
+  shell: true,
 });
 
 // Each known interactive drizzle-kit prompt is matched here. We answer
