@@ -1,0 +1,59 @@
+# ============================
+# Node / Package Managers
+# ============================
+node_modules/
+plugins/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================
+# OS / Editor
+# ============================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ============================
+# Environment Files
+# ============================
+.env
+.env.*
+*.env
+
+# Allow example env files
+!.env.example
+!*.env.example
+
+# ============================
+# Build & Cache
+# ============================
+dist/
+build/
+coverage/
+*.log
+*.tar.gz
+
+# ============================
+# Runtime Directories
+# ============================
+data/*
+kyc/*
+logs/*
+export/*
+
+# Keep folders
+!data/
+!kyc/
+!logs/
+!export/
+
+# ============================
+# Optional Placeholders
+# ============================
+!data/.gitkeep
+!kyc/.gitkeep
+!logs/.gitkeep
+!export/.gitkeep

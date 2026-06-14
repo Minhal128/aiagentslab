@@ -1,0 +1,15 @@
+'use strict';
+export { registerUsersRoutes } from './users-routes';
+export { registerPlansRoutes } from './plans-routes';
+export { registerCreditPackagesRoutes } from './credit-packages-routes';
+export { registerSettingsRoutes } from './settings-routes';
+export { registerConnectionsRoutes } from './connections-routes';
+export { registerWebhooksSetupRoutes } from './webhooks-setup-routes';
+export { registerBrandingRoutes } from './branding-routes';
+export { registerSmtpRoutes } from './smtp-routes';
+export { registerSeoRoutes } from './seo-routes';
+export { registerPhoneNumbersRoutes } from './phone-numbers-routes';
+export { registerElevenlabsPoolRoutes } from './elevenlabs-pool-routes';
+export { registerCallsModerationRoutes } from './calls-moderation-routes';
+export { registerSystemUpdateRoutes } from './system-update-routes';
+export { registerCreditBackfillRoutes } from './credit-backfill-routes';

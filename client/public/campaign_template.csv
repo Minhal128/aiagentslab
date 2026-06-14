@@ -1,0 +1,3 @@
+phone_number,first_name,last_name,contact_name,email,city,company,language
++12345678900,John,Smith,John Smith,john@example.com,London,Acme Inc,en
++48517067931,Anna,Kowalska,Anna Kowalska,anna@example.pl,Warsaw,Tech Corp,pl

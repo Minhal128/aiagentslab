@@ -1,0 +1,381 @@
+import { Request, Response } from 'express';
+import { db } from '../db';
+import { calls } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
+import WebSocket from 'ws';
+import { getTwilioClient } from '../services/twilio-connector';
+import { getDomain } from '../utils/domain';
+import { elevenLabsService } from '../services/elevenlabs';
+import twilio from 'twilio';
+
+// Store active WebSocket connections
+const activeConnections = new Map<string, WebSocket>();
+
+export async function handleTwilioVoiceWebhook(req: Request, res: Response) {
+  try {
+    console.log(`🎙️ [Voice Webhook] Received request from Twilio`);
+    console.log(`   Query params:`, req.query);
+    console.log(`   Body:`, req.body);
+    
+    const { callId, agentId } = req.query;
+    
+    if (!callId || !agentId) {
+      console.error(`❌ [Voice Webhook] Missing required parameters - callId: ${callId}, agentId: ${agentId}`);
+      return res.status(400).send('Missing required parameters');
+    }
+
+    console.log(`✅ [Voice Webhook] Call ${callId} answered, agent: ${agentId}`);
+
+    // Update call status
+    await db
+      .update(calls)
+      .set({ status: 'answered' })
+      .where(eq(calls.id, callId as string));
+
+    // Generate TwiML using Twilio's VoiceResponse to ensure proper XML formatting
+    const domain = getDomain(req.headers.host as string);
+    const streamUrl = `wss://${domain}/api/webhooks/twilio/stream`;
+    
+    console.log(`📞 [Voice Webhook] Creating TwiML with stream URL: ${streamUrl}`);
+    console.log(`   Parameters: callId=${callId}, agentId=${agentId}`);
+    
+    // Use Twilio's VoiceResponse class to generate valid TwiML
+    const VoiceResponse = twilio.twiml.VoiceResponse;
+    const response = new VoiceResponse();
+    const connect = response.connect();
+    
+    // Use Twilio's <Parameter> elements to pass custom data
+    const stream = connect.stream({ url: streamUrl });
+    stream.parameter({ name: 'callId', value: callId as string });
+    stream.parameter({ name: 'agentId', value: agentId as string });
+    
+    const twimlString = response.toString();
+    console.log(`📄 [Voice Webhook] Generated TwiML:\n${twimlString}`);
+    
+    res.type('text/xml');
+    res.send(twimlString);
+  } catch (error) {
+    console.error('Voice webhook error:', error);
+    res.status(500).send('Internal server error');
+  }
+}
+
+export async function handleTwilioStatusWebhook(req: Request, res: Response) {
+  try {
+    console.log(`📊 [Status Webhook] Received status update from Twilio`);
+    console.log(`   Query params:`, req.query);
+    console.log(`   Body:`, req.body);
+    
+    const { callId } = req.query;
+    const { CallStatus, CallDuration, RecordingUrl } = req.body;
+    
+    if (!callId) {
+      console.error(`❌ [Status Webhook] Missing call ID`);
+      return res.status(400).send('Missing call ID');
+    }
+
+    // Map Twilio status to our status
+    const statusMap: Record<string, string> = {
+      'initiated': 'initiated',
+      'ringing': 'ringing',
+      'in-progress': 'in-progress',
+      'completed': 'completed',
+      'busy': 'busy',
+      'failed': 'failed',
+      'no-answer': 'no-answer'
+    };
+
+    const status = statusMap[CallStatus] || CallStatus;
+    
+    // Update call record
+    const updateData: any = { status };
+    
+    if (CallStatus === 'completed') {
+      updateData.endedAt = new Date();
+      if (CallDuration) {
+        updateData.duration = parseInt(CallDuration);
+      }
+    }
+
+    await db
+      .update(calls)
+      .set(updateData)
+      .where(eq(calls.id, callId as string));
+
+    console.log(`✅ [Status Webhook] Call ${callId} status updated: ${CallStatus}`);
+
+    // Close WebSocket if call ended
+    if (['completed', 'failed', 'busy', 'no-answer'].includes(CallStatus)) {
+      const ws = activeConnections.get(callId as string);
+      if (ws) {
+        ws.close();
+        activeConnections.delete(callId as string);
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Status webhook error:', error);
+    res.status(500).send('Internal server error');
+  }
+}
+
+export async function handleTwilioRecordingWebhook(req: Request, res: Response) {
+  try {
+    const { callId } = req.query;
+    const { RecordingUrl, RecordingDuration } = req.body;
+    
+    if (!callId) {
+      return res.status(400).send('Missing call ID');
+    }
+
+    // Update call with recording URL
+    await db
+      .update(calls)
+      .set({ 
+        recordingUrl: RecordingUrl,
+        duration: RecordingDuration ? parseInt(RecordingDuration) : undefined
+      })
+      .where(eq(calls.id, callId as string));
+
+    console.log(`[Recording Webhook] Call ${callId} recording URL: ${RecordingUrl}`);
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('Recording webhook error:', error);
+    res.status(500).send('Internal server error');
+  }
+}
+
+// WebSocket handler for streaming audio between Twilio and ElevenLabs
+export async function handleTwilioStreamWebSocket(ws: WebSocket, req: Request) {
+  console.log(`[Stream] WebSocket connection established, waiting for Twilio start message...`);
+
+  let callId: string | null = null;
+  let agentId: string | null = null;
+  let streamSid: string | null = null;
+  let elevenLabsWs: WebSocket | null = null;
+  let mediaPacketCount = 0;
+
+  // Handle messages from Twilio
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      
+      switch (data.event) {
+        case 'start':
+          // Extract parameters from Twilio's start message
+          streamSid = data.start.streamSid;
+          const customParams = data.start.customParameters || {};
+          callId = customParams.callId;
+          agentId = customParams.agentId;
+          
+          console.log(`✅ [Twilio] Media stream started`);
+          console.log(`   StreamSid: ${streamSid}`);
+          console.log(`   CallId: ${callId}`);
+          console.log(`   AgentId: ${agentId}`);
+          console.log(`   Custom parameters:`, JSON.stringify(customParams, null, 2));
+          
+          if (!callId || !agentId) {
+            console.error('[Stream] Missing required parameters in start message');
+            ws.close(1002, 'Missing parameters');
+            return;
+          }
+
+          try {
+            // Store this connection
+            activeConnections.set(callId, ws);
+
+            // Generate a fresh signed URL for ElevenLabs WebSocket
+            console.log(`[Stream] Getting fresh signed URL for agent ${agentId}`);
+            const wsAuth = await elevenLabsService.getConversationWebSocketAuth(agentId);
+            
+            if (!wsAuth.signed_url) {
+              throw new Error('Failed to get signed URL from ElevenLabs');
+            }
+
+            // Connect to ElevenLabs WebSocket using the fresh signed URL
+            console.log(`[ElevenLabs] Attempting to connect to ElevenLabs WebSocket...`);
+            console.log(`[ElevenLabs] Signed URL obtained (first 100 chars): ${wsAuth.signed_url.substring(0, 100)}...`);
+            elevenLabsWs = new WebSocket(wsAuth.signed_url);
+            
+            // Handle ElevenLabs WebSocket open
+            elevenLabsWs.on('open', () => {
+              console.log(`✅ [ElevenLabs] WebSocket connection established for call ${callId}`);
+      
+      // Send initial configuration to start the conversation
+      const initialConfig = {
+        type: "conversation_initiation_client_data",
+        conversation_config_override: {
+          agent: {
+            first_message: "Hello! Thanks for calling. How can I help you today?",
+          },
+        },
+      };
+      
+      console.log(`[ElevenLabs] Sending conversation initiation config`);
+      if (elevenLabsWs) {
+        elevenLabsWs.send(JSON.stringify(initialConfig));
+      }
+    });
+
+    // Handle messages from ElevenLabs
+    elevenLabsWs.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log(`📨 [ElevenLabs] Received message type: ${message.type}`);
+        
+        switch (message.type) {
+          case 'conversation_initiation_metadata':
+            console.log(`✅ [ElevenLabs] Conversation initiated for call ${callId}`);
+            console.log(`[ElevenLabs] Metadata:`, JSON.stringify(message, null, 2));
+            break;
+            
+          case 'audio':
+            // Send audio from ElevenLabs to Twilio
+            // Handle both audio formats: audio.chunk and audio_event.audio_base_64
+            let audioPayload: string | null = null;
+            
+            if (message.audio?.chunk) {
+              audioPayload = message.audio.chunk;
+            } else if (message.audio_event?.audio_base_64) {
+              audioPayload = message.audio_event.audio_base_64;
+            }
+            
+            if (audioPayload && streamSid) {
+              const audioData = {
+                event: 'media',
+                streamSid,
+                media: {
+                  payload: audioPayload,
+                },
+              };
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(audioData));
+              } else {
+                console.error(`❌ [ElevenLabs→Twilio] Cannot send audio - Twilio WS not open (state: ${ws.readyState})`);
+              }
+            } else if (!streamSid) {
+              console.warn(`⚠️  [ElevenLabs] streamSid not yet set, cannot send audio to Twilio`);
+            }
+            break;
+            
+          case 'interruption':
+            console.log(`🛑 [ElevenLabs] User interruption detected`);
+            // Clear Twilio's audio buffer when user interrupts
+            if (streamSid && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ event: 'clear', streamSid }));
+            }
+            break;
+            
+          case 'ping':
+            console.log(`🏓 [ElevenLabs] Ping received, sending pong`);
+            // Respond to ping to keep connection alive
+            if (message.ping_event?.event_id && elevenLabsWs) {
+              const pongResponse = {
+                type: 'pong',
+                event_id: message.ping_event.event_id,
+              };
+              elevenLabsWs.send(JSON.stringify(pongResponse));
+            }
+            break;
+            
+          default:
+            console.log(`❓ [ElevenLabs] Unhandled message type: ${message.type}`, message);
+        }
+      } catch (error) {
+        console.error(`❌ [ElevenLabs] Error parsing message for call ${callId}:`, error);
+        console.error(`[ElevenLabs] Raw message:`, data.toString());
+      }
+    });
+
+    // Handle ElevenLabs errors
+    elevenLabsWs.on('error', (error) => {
+      console.error(`[ElevenLabs] WebSocket error for call ${callId}:`, error);
+    });
+
+    // Handle ElevenLabs close
+    elevenLabsWs.on('close', () => {
+      console.log(`[ElevenLabs] WebSocket closed for call ${callId}`);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+
+    // Handle messages from Twilio
+    let mediaPacketCount = 0;
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        switch (data.event) {
+          case 'start':
+            streamSid = data.start.streamSid;
+            console.log(`✅ [Twilio] Media stream started for call ${callId}`);
+            console.log(`[Twilio] StreamSid: ${streamSid}`);
+            console.log(`[Twilio] Stream details:`, JSON.stringify(data.start, null, 2));
+            break;
+            
+          case 'media':
+            mediaPacketCount++;
+            // Only log every 50th packet to avoid spam
+            if (mediaPacketCount % 50 === 0) {
+              console.log(`🎤 [Twilio→ElevenLabs] Sent ${mediaPacketCount} audio packets`);
+            }
+            
+            // Send audio from Twilio to ElevenLabs
+            if (elevenLabsWs && elevenLabsWs.readyState === WebSocket.OPEN && data.media?.payload) {
+              const audioMessage = {
+                user_audio_chunk: data.media.payload, // Already base64 from Twilio
+              };
+              elevenLabsWs.send(JSON.stringify(audioMessage));
+            } else {
+              if (mediaPacketCount === 1) {
+                console.error(`❌ [Twilio→ElevenLabs] Cannot send audio - ElevenLabs WS not ready`);
+                console.error(`   ElevenLabs state: ${elevenLabsWs?.readyState}`);
+              }
+            }
+            break;
+            
+          case 'stop':
+            console.log(`🛑 [Twilio] Media stream stopped for call ${callId}`);
+            console.log(`[Twilio] Total media packets received: ${mediaPacketCount}`);
+            if (elevenLabsWs) {
+              elevenLabsWs.close();
+            }
+            break;
+            
+          default:
+            console.log(`❓ [Twilio] Received unhandled event: ${data.event}`, data);
+        }
+      } catch (error) {
+        console.error(`❌ [Twilio] Error processing message for call ${callId}:`, error);
+        console.error(`[Twilio] Raw message:`, message.toString());
+      }
+    });
+
+    // Handle Twilio close
+    ws.on('close', () => {
+      console.log(`[Twilio] WebSocket closed for call ${callId}`);
+      if (elevenLabsWs) {
+        elevenLabsWs.close();
+      }
+      activeConnections.delete(callId);
+    });
+
+    // Handle Twilio errors
+    ws.on('error', (error) => {
+      console.error(`[Twilio] WebSocket error for call ${callId}:`, error);
+      if (elevenLabsWs) {
+        elevenLabsWs.close();
+      }
+    });
+
+  } catch (error) {
+    console.error(`[Stream] Error initializing conversation for call ${callId}:`, error);
+    if (elevenLabsWs) {
+      elevenLabsWs.close();
+    }
+    ws.close();
+  }
+}

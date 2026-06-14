@@ -1,0 +1,20 @@
+{
+  "name": "@diploy/core",
+  "version": "1.0.0",
+  "description": "Core utilities for AgentLabs - Diploy Technologies",
+  "main": "index.ts",
+  "types": "index.ts",
+  "author": "BTPL Engineering Team <cs@diploy.in>",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "homepage": "https://diploy.in",
+  "repository": {
+    "type": "git",
+    "url": "https://diploy.in"
+  },
+  "keywords": [
+    "diploy",
+    "agentlabs",
+    "ai-calling",
+    "elevenlabs"
+  ]
+}
