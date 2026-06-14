@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script>
+    window.onerror = function (msg, src, line, col, err) {
+      if (err instanceof SyntaxError || (typeof msg === 'string' && msg.indexOf('SyntaxError') !== -1)) {
+        if (!err || !err.stack || !err.stack.includes(' at ')) {
+          return true;
+        }
+      }
+      return false;
+    };
+    window.addEventListener("error", function (evt) {
+      if (!evt.error || (evt.error instanceof SyntaxError && (!evt.error.stack || !evt.error.stack.includes(" at ")))) {
+        evt.stopImmediatePropagation();
+        evt.preventDefault();
+        return;
+      }
+    }, true);
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>Loading...</title>
+  <meta name="description" content="" />
+  <link rel="icon" type="image/png" href="/favicon.png" id="dynamic-favicon" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        var cached = localStorage.getItem('agentlabs-branding:v1');
+        if (cached) {
+          var parsed = JSON.parse(cached);
+          if (parsed.data) {
+            if (parsed.data.app_name) {
+              document.title = parsed.data.app_tagline
+                ? parsed.data.app_name + ' - ' + parsed.data.app_tagline
+                : parsed.data.app_name;
+            }
+            if (parsed.data.favicon_url) {
+              var favicon = document.getElementById('dynamic-favicon');
+              if (favicon) favicon.href = parsed.data.favicon_url;
+            }
+          }
+        }
+      } catch (e) { }
+    })();
+  </script>
+  <script type="module" crossorigin src="/assets/index-B6kKWWre.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-iomYCLiB.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <!-- tes Voice Widget -->
+  <script>
+    (function (w, d, s, o, f, js) {
+      w[o] = w[o] || function () { (w[o].q = w[o].q || []).push(arguments) };
+      js = d.createElement(s); js.id = o; js.src = f; js.async = 1;
+      (d.head || d.body).appendChild(js);
+    }(window, document, 'script', 'vw', 'http://localhost:5000/widget/embed.js?v=2'));
+    vw('init', 'wgt_EyA-692rU2HjRGXoFS5wXmTI');
+  </script>
+</body>
+
+</html>

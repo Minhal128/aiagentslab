@@ -30,7 +30,6 @@ Thumbs.db
 # ============================
 # Build & Cache
 # ============================
-dist/
 build/
 coverage/
 *.log
