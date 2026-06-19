@@ -239,7 +239,17 @@ googleSheetsRouter.get("/status", async (req: Request, res: Response) => {
   }
 
   const status = await getConnectionStatus(userId);
-  res.json(status);
+  // Surface server-side OAuth config status so the UI can show *why* a user
+  // can't connect (e.g. the deploy is missing GOOGLE_CLIENT_ID/SECRET).
+  const serverCreds = await getGoogleCredentials();
+  const oauthConfigured = !!serverCreds;
+  res.json({
+    ...status,
+    oauthConfigured,
+    oauthError: oauthConfigured
+      ? undefined
+      : "Google OAuth client credentials are not configured on this server. Add them in Admin > Settings (or set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars) before users can connect.",
+  });
 });
 
 googleSheetsRouter.delete("/disconnect", async (req: Request, res: Response) => {
@@ -274,4 +284,72 @@ googleSheetsRouter.get("/sheets/:spreadsheetId/tabs", async (req: Request, res: 
   const { spreadsheetId } = req.params;
   const tabs = await listSheetTabs(userId, spreadsheetId);
   res.json(tabs);
+});
+
+// Debug-only endpoint: tells the operator *exactly* why Google Sheets is/isn't
+// working for this user (server-side OAuth config, refresh token presence, expiry,
+// and a real Drive API probe). Frontend Admin panel can call this when "Connect"
+// fails silently.
+googleSheetsRouter.get("/diagnostics", async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const serverCreds = await getGoogleCredentials();
+  const oauthConfigured = !!serverCreds;
+  const oauthSource = serverCreds
+    ? (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "env" : "database")
+    : "none";
+
+  const [cred] = await db
+    .select({
+      hasRefreshToken: googleSheetsCredentials.refreshToken,
+      tokenExpiry: googleSheetsCredentials.tokenExpiry,
+      connectedEmail: googleSheetsCredentials.connectedEmail,
+    })
+    .from(googleSheetsCredentials)
+    .where(eq(googleSheetsCredentials.userId, userId))
+    .limit(1);
+
+  // Live probe: try to call Drive API to confirm the token actually works.
+  let probeResult: { ok: boolean; status?: number; error?: string } = { ok: false };
+  if (cred) {
+    try {
+      const { refreshAccessToken } = await import("./google-sheets.service");
+      const token = await refreshAccessToken(userId);
+      if (!token) {
+        probeResult = { ok: false, error: "refresh_failed" };
+      } else {
+        const probeResp = await fetch(
+          "https://www.googleapis.com/drive/v3/files?pageSize=1&q=mimeType='application/vnd.google-apps.spreadsheet'&trashed=false&fields=files(id)",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (probeResp.ok) {
+          probeResult = { ok: true, status: probeResp.status };
+        } else {
+          probeResult = { ok: false, status: probeResp.status, error: await probeResp.text() };
+        }
+      }
+    } catch (err: any) {
+      probeResult = { ok: false, error: err.message };
+    }
+  }
+
+  res.json({
+    oauthConfigured,
+    oauthSource,
+    hasConnectedAccount: !!cred,
+    connectedEmail: cred?.connectedEmail ?? null,
+    tokenValidUntil: cred?.tokenExpiry ?? null,
+    liveProbe: probeResult,
+    suggestion: !oauthConfigured
+      ? "Configure Google OAuth client credentials (Admin > Settings) or set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars."
+      : !cred
+        ? "User has not connected a Google account yet. Use the Connect button to start OAuth."
+        : !probeResult.ok
+          ? "Refresh token is invalid or revoked. User must disconnect and reconnect their Google account."
+          : "OK — Google Sheets connection is healthy.",
+  });
 });

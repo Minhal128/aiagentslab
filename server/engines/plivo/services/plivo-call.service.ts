@@ -14,7 +14,7 @@
 
 import * as plivo from 'plivo';
 import { db } from "../../../db";
-import { plivoCalls, plivoCredentials, plivoPhoneNumbers, users, creditTransactions, contacts, campaigns, agents, flows, flowExecutions, calls } from "@shared/schema";
+import { plivoCalls, plivoCredentials, plivoPhoneNumbers, users, creditTransactions, contacts, campaigns, agents, flows, flowExecutions, calls, appointments } from "@shared/schema";
 import { logger } from '../../../utils/logger';
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { PlivoCall, PlivoCallStatus, OpenAIVoice, OpenAIRealtimeModel, PlivoCallSentiment, PlivoCallInitiateResponse } from '../types';
@@ -38,6 +38,26 @@ interface PlivoCredentialRecord {
 
 export class PlivoCallService {
   private static plivoClients: Map<string, plivo.Client> = new Map();
+
+  /**
+   * Numeric rank used by syncCallsRow to prevent status rollbacks.
+   * - pending: 0
+   * - ringing/in-progress/answered: 1
+   * - terminal states (completed/failed/busy/no-answer/canceled): 2
+   * Anything we don't recognize falls back to -1 and is treated as "do not write".
+   */
+  private static readonly STATUS_RANK: Record<string, number> = {
+    pending: 0,
+    ringing: 1,
+    'in-progress': 1,
+    answered: 1,
+    completed: 2,
+    succeeded: 2,
+    failed: 2,
+    busy: 2,
+    'no-answer': 2,
+    canceled: 2,
+  };
 
   /**
    * Get or create a Plivo client for a given credential
@@ -435,6 +455,13 @@ export class PlivoCallService {
       updateData.answeredAt = new Date();
     }
 
+    // Mirror intermediate statuses (e.g. 'in-progress') to the canonical `calls`
+    // row so a Plivo-numbered campaign shows live progress in the UI, not "pending
+    // forever". Terminal-state mirroring is handled further down in this function.
+    if (status === 'in-progress' || status === 'ringing') {
+      await PlivoCallService.syncCallsRow(callId, { status });
+    }
+
     if (['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(status)) {
       updateData.endedAt = new Date();
 
@@ -527,24 +554,30 @@ export class PlivoCallService {
       }
 
       // Update the pre-created calls table record (created by campaign-executor for UI tracking).
-      // Plivo engine tracks calls in plivoCalls; those records are never linked to the calls table.
+      // Plivo engine tracks calls in plivoCalls; this mirror keeps the canonical `calls`
+      // row in sync so the rest of the app (reports, dashboard, Calls page, appointments)
+      // sees the same data it would for a Twilio/ElevenLabs/OpenAI call.
       if (call.campaignId && call.contactId) {
-        try {
-          const terminalCallStatus = status === 'completed' ? 'completed' : 'failed';
-          await db
-            .update(calls)
-            .set({
-              status: terminalCallStatus,
-              duration: updateData.duration ?? null,
-              endedAt: new Date(),
-            })
-            .where(and(
-              eq(calls.campaignId, call.campaignId),
-              eq(calls.contactId, call.contactId)
-            ));
-        } catch (callsUpdateErr: any) {
-          logger.error(`Failed to sync calls table for contact ${call.contactId}: ${callsUpdateErr.message}`, undefined, 'PlivoCall');
+        const terminalCallStatus = status === 'completed' ? 'completed' : 'failed';
+        const mirrorFields: Partial<typeof calls.$inferInsert> = {
+          status: terminalCallStatus,
+          endedAt: new Date(),
+        };
+        if (typeof updateData.duration === 'number' && updateData.duration > 0) {
+          mirrorFields.duration = updateData.duration;
         }
+        // Opportunistic: if the recording-ready webhook already fired before the
+        // end-of-call status update, copy the URL over now so it shows in reports
+        // even if the order of Plivo webhooks is reversed.
+        if (call.recordingUrl) {
+          mirrorFields.recordingUrl = call.recordingUrl;
+        }
+        await PlivoCallService.syncCallsRow(callId, mirrorFields);
+
+        // Re-link any appointments that were stamped with this plivo_call.id
+        // (the AI agent factory passes the plivo_call row when booking appointments;
+        // the reports page joins appointments.callId = calls.id).
+        await PlivoCallService.relinkAppointmentsForPlivoCall(callId);
       }
 
       if (call.campaignId) {
@@ -815,6 +848,179 @@ export class PlivoCallService {
   }
 
   /**
+   * Mirror a subset of plivo_calls fields onto the canonical `calls` row.
+   *
+   * The Plivo engine writes everything into its own `plivo_calls` table. The rest
+   * of the app (reports, dashboard, Calls page, appointment join) reads from the
+   * shared `calls` table. This helper keeps them in sync for the columns the UI
+   * actually displays, so a Plivo-numbered campaign behaves the same as Twilio,
+   * OpenAI, or ElevenLabs in the UI.
+   *
+   * Lookup is by (campaignId, contactId): campaign-executor creates exactly one
+   * `calls` row per contact in a campaign, so this 1:1 match is reliable.
+   *
+   * Safety guarantees:
+   *  - Never writes an empty/null value over an existing non-null value
+   *  - Never writes `status` backwards (won't downgrade `completed` to `in-progress`)
+   *  - All errors are caught and logged — mirror failures MUST NOT break Plivo
+   *  - No-op if there's no `calls` row (the row is created by campaign-executor for
+   *    campaigns; for inbound/test calls there is no calls row, and that's fine)
+   */
+  private static async syncCallsRow(
+    plivoCallId: string,
+    fields: Partial<typeof calls.$inferInsert>
+  ): Promise<void> {
+    try {
+      const [plivoCall] = await db
+        .select()
+        .from(plivoCalls)
+        .where(eq(plivoCalls.id, plivoCallId))
+        .limit(1);
+      if (!plivoCall || !plivoCall.campaignId || !plivoCall.contactId) return;
+
+      // Read the existing calls row so we know what's already populated and avoid
+      // clobbering final values (recordingUrl, transcript, etc.) with nulls/empties.
+      const [existing] = await db
+        .select()
+        .from(calls)
+        .where(and(
+          eq(calls.campaignId, plivoCall.campaignId),
+          eq(calls.contactId, plivoCall.contactId)
+        ))
+        .limit(1);
+      if (!existing) return; // No calls row — nothing to mirror (inbound/test calls)
+
+      const safeFields: Record<string, unknown> = {};
+      const f = fields as Record<string, unknown>;
+
+      if ('recordingUrl' in f && f.recordingUrl && !existing.recordingUrl) {
+        safeFields.recordingUrl = f.recordingUrl;
+      }
+      if ('transcript' in f && typeof f.transcript === 'string' && f.transcript.length > 0 && !existing.transcript) {
+        safeFields.transcript = f.transcript;
+      }
+      if ('aiSummary' in f && typeof f.aiSummary === 'string' && f.aiSummary.length > 0 && !existing.aiSummary) {
+        safeFields.aiSummary = f.aiSummary;
+      }
+      if ('classification' in f && typeof f.classification === 'string' && f.classification.length > 0 && !existing.classification) {
+        safeFields.classification = f.classification;
+      }
+      if ('sentiment' in f && typeof f.sentiment === 'string' && f.sentiment.length > 0 && !existing.sentiment) {
+        safeFields.sentiment = f.sentiment;
+      }
+      if ('wasTransferred' in f && f.wasTransferred === true && !existing.wasTransferred) {
+        safeFields.wasTransferred = true;
+      }
+      if ('transferredTo' in f && typeof f.transferredTo === 'string' && f.transferredTo.length > 0 && !existing.transferredTo) {
+        safeFields.transferredTo = f.transferredTo;
+      }
+      if ('transferredAt' in f && f.transferredAt && !existing.transferredAt) {
+        safeFields.transferredAt = f.transferredAt;
+      }
+      if ('duration' in f && typeof f.duration === 'number' && f.duration > 0 && (!existing.duration || existing.duration <= 0)) {
+        safeFields.duration = f.duration;
+      }
+      // Status is special: allow forward progression only, never backwards
+      if ('status' in f && typeof f.status === 'string') {
+        const currentRank = PlivoCallService.STATUS_RANK[existing.status ?? ''] ?? -1;
+        const newRank = PlivoCallService.STATUS_RANK[f.status as string] ?? -1;
+        if (newRank >= 0 && newRank > currentRank) {
+          safeFields.status = f.status;
+        }
+      }
+      if ('endedAt' in f && f.endedAt && !existing.endedAt) {
+        safeFields.endedAt = f.endedAt;
+      }
+
+      // Mirror plivoCallUuid + plivoCredentialId into the calls.metadata JSON
+      // so the /api/calls/:id/recording route can locate the Plivo recording.
+      // (plivoCallUuid is a top-level plivoCalls column, plivoCredentialId lives
+      // in plivoCalls.metadata; neither is in the canonical `calls` schema.)
+      const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
+      const metadataPatches: Record<string, unknown> = {};
+      if (plivoCall.plivoCallUuid && !existingMetadata.plivoCallUuid) {
+        metadataPatches.plivoCallUuid = plivoCall.plivoCallUuid;
+      }
+      const plivoCredId = (plivoCall.metadata as any)?.plivoCredentialId;
+      if (plivoCredId && !existingMetadata.plivoCredentialId) {
+        metadataPatches.plivoCredentialId = plivoCredId;
+      }
+      // Also mark engine so the recording route picks the right branch.
+      if (!existingMetadata.engine) {
+        metadataPatches.engine = 'plivo-openai';
+      }
+      if (Object.keys(metadataPatches).length > 0) {
+        safeFields.metadata = { ...existingMetadata, ...metadataPatches };
+      }
+
+      if (Object.keys(safeFields).length === 0) return;
+
+      await db
+        .update(calls)
+        .set(safeFields)
+        .where(and(
+          eq(calls.campaignId, plivoCall.campaignId),
+          eq(calls.contactId, plivoCall.contactId)
+        ));
+
+      logger.info(
+        `[PlivoCall] Mirrored fields to calls row for plivo_call ${plivoCallId}: ${Object.keys(safeFields).join(', ')}`,
+        undefined,
+        'PlivoCall'
+      );
+    } catch (err: any) {
+      // Mirror failures must never break Plivo — log and move on.
+      logger.error(`[PlivoCall] syncCallsRow failed for plivo_call ${plivoCallId}: ${err.message}`, err, 'PlivoCall');
+    }
+  }
+
+  /**
+   * Re-link any appointments that were stamped with this plivo_call.id to instead
+   * point at the matching canonical calls.id.
+   *
+   * openai-agent-factory writes `appointments.callId = call.id` where `call` is
+   * the plivoCalls row. The reports page joins `appointments.callId = calls.id`,
+   * so without this rewrite appointments made during Plivo calls appear orphaned.
+   */
+  private static async relinkAppointmentsForPlivoCall(plivoCallId: string): Promise<void> {
+    try {
+      const [plivoCall] = await db
+        .select({ campaignId: plivoCalls.campaignId, contactId: plivoCalls.contactId })
+        .from(plivoCalls)
+        .where(eq(plivoCalls.id, plivoCallId))
+        .limit(1);
+      if (!plivoCall || !plivoCall.campaignId || !plivoCall.contactId) return;
+
+      const [callsRow] = await db
+        .select({ id: calls.id })
+        .from(calls)
+        .where(and(
+          eq(calls.campaignId, plivoCall.campaignId),
+          eq(calls.contactId, plivoCall.contactId)
+        ))
+        .orderBy(desc(calls.createdAt))
+        .limit(1);
+      if (!callsRow) return;
+
+      const updated = await db
+        .update(appointments)
+        .set({ callId: callsRow.id, updatedAt: new Date() })
+        .where(eq(appointments.callId, plivoCallId))
+        .returning({ id: appointments.id });
+
+      if (updated.length > 0) {
+        logger.info(
+          `[PlivoCall] Re-linked ${updated.length} appointment(s) from plivo_call ${plivoCallId} to calls row ${callsRow.id}`,
+          undefined,
+          'PlivoCall'
+        );
+      }
+    } catch (err: any) {
+      logger.error(`[PlivoCall] relinkAppointmentsForPlivoCall failed for plivo_call ${plivoCallId}: ${err.message}`, err, 'PlivoCall');
+    }
+  }
+
+  /**
    * Handle call recording ready webhook
    */
   static async handleRecordingReady(
@@ -843,6 +1049,10 @@ export class PlivoCallService {
       })
       .where(eq(plivoCalls.id, callId))
       .returning();
+
+    // Mirror recordingUrl onto the canonical `calls` row so it appears in
+    // /app/reports and /app/calls (which read from `calls`, not `plivo_calls`).
+    await PlivoCallService.syncCallsRow(callId, { recordingUrl });
 
     return updatedCall;
   }
@@ -983,6 +1193,15 @@ export class PlivoCallService {
       .where(eq(plivoCalls.id, callId))
       .returning();
 
+    // Mirror summary onto the canonical `calls` row so it appears in
+    // /app/reports and /app/calls.
+    await PlivoCallService.syncCallsRow(callId, {
+      transcript: summary.transcript,
+      aiSummary: summary.aiSummary,
+      classification: summary.leadClassification || this.inferLeadClassification(summary.leadQualityScore),
+      sentiment: summary.sentiment,
+    });
+
     return updatedCall;
   }
 
@@ -1014,6 +1233,15 @@ export class PlivoCallService {
       })
       .where(eq(plivoCalls.id, callId))
       .returning();
+
+    // Mirror transfer onto the canonical `calls` row.
+    if (updatedCall) {
+      await PlivoCallService.syncCallsRow(callId, {
+        wasTransferred: true,
+        transferredTo,
+        transferredAt: updatedCall.transferredAt ?? new Date(),
+      });
+    }
 
     // Trigger call.transferred webhook event
     if (updatedCall && updatedCall.userId) {

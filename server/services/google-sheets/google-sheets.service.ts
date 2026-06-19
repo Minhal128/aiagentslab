@@ -39,7 +39,7 @@ export async function getGoogleCredentials(): Promise<{ clientId: string; client
   return null;
 }
 
-async function refreshAccessToken(userId: string, force = false): Promise<string | null> {
+export async function refreshAccessToken(userId: string, force = false): Promise<string | null> {
   const [cred] = await db
     .select()
     .from(googleSheetsCredentials)

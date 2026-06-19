@@ -338,11 +338,13 @@ export class CampaignExecutor {
           toNumber: contact.phone,
           status: 'pending' as const,
           callDirection: 'outgoing' as const,
+          engineType: 'plivo-openai',
           metadata: {
             batchCall: true,
             batchJobId: plivoBatchJobId,
             agentId: agent.id,
             telephonyProvider: 'plivo',
+            engine: 'plivo-openai',
             contactName: `${contact.firstName} ${contact.lastName || ''}`.trim(),
           },
         }));
