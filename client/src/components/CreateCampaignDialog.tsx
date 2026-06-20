@@ -450,12 +450,13 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                 <Label htmlFor="agent-select">{t("campaigns.create.selectAgentRequired")}</Label>
                 <Select value={formData.agentId} onValueChange={(value) => setFormData({ ...formData, agentId: value })}>
                   <SelectTrigger data-testid="select-agent">
-                    <SelectValue placeholder={agents.filter(a => a.type !== 'incoming').length === 0 ? t("campaigns.create.noAgentsAvailable") : t("campaigns.create.agentPlaceholder")} />
+                    <SelectValue placeholder={agents.filter(a => a.type !== 'flow').length === 0 ? t("campaigns.create.noAgentsAvailable") : t("campaigns.create.agentPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
                     {agents
-                      .filter(agent => agent.type !== 'incoming')
                       .filter(agent => {
+                        // Exclude flow agents — they require a flow editor
+                        if (agent.type === 'flow') return false;
                         // Always exclude OpenAI SIP agents - they don't support outbound calls
                         if (agent.telephonyProvider === 'openai-sip') {
                           return false;
@@ -473,11 +474,11 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                       ))}
                   </SelectContent>
                 </Select>
-                {agents.filter(a => a.type !== 'incoming').length === 0 && (
+                {agents.filter(a => a.type !== 'flow').length === 0 && (
                   <p className="text-sm text-muted-foreground">{t("campaigns.create.goToAgentsPage")}</p>
                 )}
-                {agents.filter(a => a.type !== 'incoming').length > 0 && 
-                 agents.filter(a => a.type !== 'incoming').filter(a => {
+                {agents.filter(a => a.type !== 'flow').length > 0 &&
+                 agents.filter(a => a.type !== 'flow').filter(a => {
                    // Same filter logic as dropdown
                    if (a.telephonyProvider === 'openai-sip') return false;
                    if (a.telephonyProvider === 'elevenlabs-sip' && !isSipPluginEnabled) return false;
