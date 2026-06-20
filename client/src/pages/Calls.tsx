@@ -58,6 +58,8 @@ interface Call {
   agent?: { id: string; name: string } | null;
   widgetId?: string | null;
   widget?: { id: string; name: string } | null;
+  twilioSid?: string | null;
+  plivoCallUuid?: string | null;
 }
 
 export default function Calls() {
@@ -69,6 +71,7 @@ export default function Calls() {
   const [leadFilter, setLeadFilter] = useState("all");
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [loadingRecording, setLoadingRecording] = useState<string | null>(null);
+  const [unavailableRecordingIds, setUnavailableRecordingIds] = useState<Set<string>>(new Set());
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -260,8 +263,13 @@ export default function Calls() {
   };
 
   const hasRecording = (call: Call) => {
+    if (unavailableRecordingIds.has(call.id)) return false;
+    // Calls that never connected or have no audio content
+    if (['pending', 'failed', 'no-answer', 'initiated', 'ringing'].includes(call.status)) return false;
+    if (!call.duration || call.duration === 0) return false;
     if (call.recordingUrl || call.elevenLabsConversationId) return true;
-    if (call.engine === 'twilio-openai' || call.engine === 'plivo-openai') return true;
+    if (call.engine === 'twilio-openai' && call.twilioSid) return true;
+    if (call.engine === 'plivo-openai' && (call.plivoCallUuid || call.recordingUrl)) return true;
     return false;
   };
 
@@ -353,10 +361,11 @@ export default function Calls() {
       if (currentPlayingIdRef.current === call.id) {
         setLoadingRecording(null);
         setPlayingCallId(null);
+        setUnavailableRecordingIds(prev => new Set([...prev, call.id]));
       }
       toast({
         title: "Recording Unavailable",
-        description: error.message || "Could not load recording. Try syncing recordings first.",
+        description: error.message || "No recording found for this call.",
         variant: "destructive",
       });
     }
