@@ -21,6 +21,20 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    proxy: {
+      '/api': {
+        target: 'https://bytebeacons.online',
+        changeOrigin: true,
+        secure: true,
+        ws: false,
+      },
+      '/ws': {
+        target: 'wss://bytebeacons.online',
+        changeOrigin: true,
+        secure: true,
+        ws: true,
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],
