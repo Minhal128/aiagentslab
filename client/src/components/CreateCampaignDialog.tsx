@@ -142,9 +142,10 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
     queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
   };
 
-  const { data: agents = [] } = useQuery<Agent[]>({
+  const { data: agents = [], isLoading: agentsLoading } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
     enabled: open,
+    staleTime: 0,
   });
 
 
@@ -450,34 +451,47 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                 <Label htmlFor="agent-select">{t("campaigns.create.selectAgentRequired")}</Label>
                 <Select value={formData.agentId} onValueChange={(value) => setFormData({ ...formData, agentId: value })}>
                   <SelectTrigger data-testid="select-agent">
-                    <SelectValue placeholder={agents.filter(a => a.type !== 'flow').length === 0 ? t("campaigns.create.noAgentsAvailable") : t("campaigns.create.agentPlaceholder")} />
+                    <SelectValue placeholder={
+                      agentsLoading
+                        ? t("common.loading") || "Loading agents..."
+                        : agents.filter(a => a.type !== 'flow').length === 0
+                          ? t("campaigns.create.noAgentsAvailable")
+                          : t("campaigns.create.agentPlaceholder")
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {agents
-                      .filter(agent => {
-                        // Exclude flow agents — they require a flow editor
-                        if (agent.type === 'flow') return false;
-                        // Always exclude OpenAI SIP agents - they don't support outbound calls
-                        if (agent.telephonyProvider === 'openai-sip') {
-                          return false;
-                        }
-                        // Filter out ElevenLabs SIP agents when SIP plugin is disabled
-                        if (agent.telephonyProvider === 'elevenlabs-sip' && !isSipPluginEnabled) {
-                          return false;
-                        }
-                        return true;
-                      })
-                      .map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name} - {agent.personality} ({agent.type === 'flow' ? t("agents.type.flow") : t("agents.type.natural")}) [{getEngineLabel(agent.telephonyProvider)}]
-                        </SelectItem>
-                      ))}
+                    {agentsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">{t("common.loading") || "Loading agents..."}</span>
+                      </div>
+                    ) : (
+                      agents
+                        .filter(agent => {
+                          // Exclude flow agents — they require a flow editor
+                          if (agent.type === 'flow') return false;
+                          // Always exclude OpenAI SIP agents - they don't support outbound calls
+                          if (agent.telephonyProvider === 'openai-sip') {
+                            return false;
+                          }
+                          // Filter out ElevenLabs SIP agents when SIP plugin is disabled
+                          if (agent.telephonyProvider === 'elevenlabs-sip' && !isSipPluginEnabled) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name} - {agent.personality} ({agent.type === 'flow' ? t("agents.type.flow") : t("agents.type.natural")}) [{getEngineLabel(agent.telephonyProvider)}]
+                          </SelectItem>
+                        ))
+                    )}
                   </SelectContent>
                 </Select>
-                {agents.filter(a => a.type !== 'flow').length === 0 && (
+                {!agentsLoading && agents.filter(a => a.type !== 'flow').length === 0 && (
                   <p className="text-sm text-muted-foreground">{t("campaigns.create.goToAgentsPage")}</p>
                 )}
-                {agents.filter(a => a.type !== 'flow').length > 0 &&
+                {!agentsLoading && agents.filter(a => a.type !== 'flow').length > 0 &&
                  agents.filter(a => a.type !== 'flow').filter(a => {
                    // Same filter logic as dropdown
                    if (a.telephonyProvider === 'openai-sip') return false;

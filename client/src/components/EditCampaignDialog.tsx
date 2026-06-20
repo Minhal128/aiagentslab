@@ -155,6 +155,7 @@ export function EditCampaignDialog({ open, onOpenChange, campaign }: EditCampaig
   const { data: agents = [] } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
     enabled: open,
+    staleTime: 0,
   });
 
   const { data: phoneNumbers = [] } = useQuery<PhoneNumber[]>({
