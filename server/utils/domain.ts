@@ -54,8 +54,8 @@ export function getDomain(fallbackHost?: string): string {
   }
   
   if (!domain) {
-    console.warn('⚠️  [Domain] No domain configured! Webhook/callback URLs will use http://localhost:5000 which will NOT work in production. Please set APP_DOMAIN in your environment variables (e.g., APP_DOMAIN=app.yourdomain.com).');
-    domain = 'http://localhost:5000';
+    console.warn('⚠️  [Domain] No domain configured! Webhook/callback URLs will use http://localhost:3000 which will NOT work in production. Please set APP_DOMAIN in your environment variables (e.g., APP_DOMAIN=app.yourdomain.com).');
+    domain = 'http://localhost:3000';
   }
   
   // Ensure domain always has https:// protocol prefix

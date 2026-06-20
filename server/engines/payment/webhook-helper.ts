@@ -24,7 +24,7 @@ function getValidatedFrontendUrl(): string {
     }
     // Log error but don't crash - fallback for backwards compatibility
     console.error('[CONFIG ERROR] Production requires APP_DOMAIN or APP_URL to be set');
-    return 'http://localhost:5000'; // Will fail gracefully
+    return 'http://localhost:3000'; // Will fail gracefully
   }
   
   // Development environment
@@ -33,7 +33,7 @@ function getValidatedFrontendUrl(): string {
     const domain = stripProtocol(process.env.APP_DOMAIN);
     return `https://${domain}`;
   }
-  return process.env.APP_URL || 'http://localhost:5000';
+  return process.env.APP_URL || 'http://localhost:3000';
 }
 
 export const FRONTEND_URL = getValidatedFrontendUrl();
