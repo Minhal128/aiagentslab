@@ -5750,8 +5750,8 @@ function getDomain(fallbackHost) {
     domain = fallbackHost;
   }
   if (!domain) {
-    console.warn("\u26A0\uFE0F  [Domain] No domain configured! Webhook/callback URLs will use http://localhost:5000 which will NOT work in production. Please set APP_DOMAIN in your environment variables (e.g., APP_DOMAIN=app.yourdomain.com).");
-    domain = "http://localhost:5000";
+    console.warn("\u26A0\uFE0F  [Domain] No domain configured! Webhook/callback URLs will use http://localhost:3000 which will NOT work in production. Please set APP_DOMAIN in your environment variables (e.g., APP_DOMAIN=app.yourdomain.com).");
+    domain = "http://localhost:3000";
   }
   if (!domain.startsWith("http://") && !domain.startsWith("https://")) {
     domain = "https://" + domain;
@@ -11472,7 +11472,8 @@ __export(google_sheets_service_exports, {
   getConnectionStatus: () => getConnectionStatus,
   getGoogleCredentials: () => getGoogleCredentials,
   listSheetTabs: () => listSheetTabs,
-  listUserSheets: () => listUserSheets
+  listUserSheets: () => listUserSheets,
+  refreshAccessToken: () => refreshAccessToken
 });
 import { eq as eq6 } from "drizzle-orm";
 async function getGoogleCredentials() {
@@ -20163,8 +20164,27 @@ var init_plivo_call_service = __esm({
     init_call_insights_service();
     init_domain();
     init_webhook_delivery();
-    PlivoCallService = class {
+    PlivoCallService = class _PlivoCallService {
       static plivoClients = /* @__PURE__ */ new Map();
+      /**
+       * Numeric rank used by syncCallsRow to prevent status rollbacks.
+       * - pending: 0
+       * - ringing/in-progress/answered: 1
+       * - terminal states (completed/failed/busy/no-answer/canceled): 2
+       * Anything we don't recognize falls back to -1 and is treated as "do not write".
+       */
+      static STATUS_RANK = {
+        pending: 0,
+        ringing: 1,
+        "in-progress": 1,
+        answered: 1,
+        completed: 2,
+        succeeded: 2,
+        failed: 2,
+        busy: 2,
+        "no-answer": 2,
+        canceled: 2
+      };
       /**
        * Get or create a Plivo client for a given credential
        */
@@ -20425,6 +20445,9 @@ var init_plivo_call_service = __esm({
         if (status === "in-progress") {
           updateData.answeredAt = /* @__PURE__ */ new Date();
         }
+        if (status === "in-progress" || status === "ringing") {
+          await _PlivoCallService.syncCallsRow(callId, { status });
+        }
         if (["completed", "busy", "failed", "no-answer", "canceled"].includes(status)) {
           updateData.endedAt = /* @__PURE__ */ new Date();
           if (call.openaiCredentialId) {
@@ -20486,19 +20509,19 @@ var init_plivo_call_service = __esm({
             await db.update(contacts).set({ status: "failed" }).where(eq26(contacts.id, call.contactId));
           }
           if (call.campaignId && call.contactId) {
-            try {
-              const terminalCallStatus = status === "completed" ? "completed" : "failed";
-              await db.update(calls).set({
-                status: terminalCallStatus,
-                duration: updateData.duration ?? null,
-                endedAt: /* @__PURE__ */ new Date()
-              }).where(and19(
-                eq26(calls.campaignId, call.campaignId),
-                eq26(calls.contactId, call.contactId)
-              ));
-            } catch (callsUpdateErr) {
-              logger.error(`Failed to sync calls table for contact ${call.contactId}: ${callsUpdateErr.message}`, void 0, "PlivoCall");
+            const terminalCallStatus = status === "completed" ? "completed" : "failed";
+            const mirrorFields = {
+              status: terminalCallStatus,
+              endedAt: /* @__PURE__ */ new Date()
+            };
+            if (typeof updateData.duration === "number" && updateData.duration > 0) {
+              mirrorFields.duration = updateData.duration;
             }
+            if (call.recordingUrl) {
+              mirrorFields.recordingUrl = call.recordingUrl;
+            }
+            await _PlivoCallService.syncCallsRow(callId, mirrorFields);
+            await _PlivoCallService.relinkAppointmentsForPlivoCall(callId);
           }
           if (call.campaignId) {
             if (status === "completed") {
@@ -20699,6 +20722,131 @@ var init_plivo_call_service = __esm({
         return updatedCall;
       }
       /**
+       * Mirror a subset of plivo_calls fields onto the canonical `calls` row.
+       *
+       * The Plivo engine writes everything into its own `plivo_calls` table. The rest
+       * of the app (reports, dashboard, Calls page, appointment join) reads from the
+       * shared `calls` table. This helper keeps them in sync for the columns the UI
+       * actually displays, so a Plivo-numbered campaign behaves the same as Twilio,
+       * OpenAI, or ElevenLabs in the UI.
+       *
+       * Lookup is by (campaignId, contactId): campaign-executor creates exactly one
+       * `calls` row per contact in a campaign, so this 1:1 match is reliable.
+       *
+       * Safety guarantees:
+       *  - Never writes an empty/null value over an existing non-null value
+       *  - Never writes `status` backwards (won't downgrade `completed` to `in-progress`)
+       *  - All errors are caught and logged — mirror failures MUST NOT break Plivo
+       *  - No-op if there's no `calls` row (the row is created by campaign-executor for
+       *    campaigns; for inbound/test calls there is no calls row, and that's fine)
+       */
+      static async syncCallsRow(plivoCallId, fields) {
+        try {
+          const [plivoCall] = await db.select().from(plivoCalls).where(eq26(plivoCalls.id, plivoCallId)).limit(1);
+          if (!plivoCall || !plivoCall.campaignId || !plivoCall.contactId) return;
+          const [existing] = await db.select().from(calls).where(and19(
+            eq26(calls.campaignId, plivoCall.campaignId),
+            eq26(calls.contactId, plivoCall.contactId)
+          )).limit(1);
+          if (!existing) return;
+          const safeFields = {};
+          const f = fields;
+          if ("recordingUrl" in f && f.recordingUrl && !existing.recordingUrl) {
+            safeFields.recordingUrl = f.recordingUrl;
+          }
+          if ("transcript" in f && typeof f.transcript === "string" && f.transcript.length > 0 && !existing.transcript) {
+            safeFields.transcript = f.transcript;
+          }
+          if ("aiSummary" in f && typeof f.aiSummary === "string" && f.aiSummary.length > 0 && !existing.aiSummary) {
+            safeFields.aiSummary = f.aiSummary;
+          }
+          if ("classification" in f && typeof f.classification === "string" && f.classification.length > 0 && !existing.classification) {
+            safeFields.classification = f.classification;
+          }
+          if ("sentiment" in f && typeof f.sentiment === "string" && f.sentiment.length > 0 && !existing.sentiment) {
+            safeFields.sentiment = f.sentiment;
+          }
+          if ("wasTransferred" in f && f.wasTransferred === true && !existing.wasTransferred) {
+            safeFields.wasTransferred = true;
+          }
+          if ("transferredTo" in f && typeof f.transferredTo === "string" && f.transferredTo.length > 0 && !existing.transferredTo) {
+            safeFields.transferredTo = f.transferredTo;
+          }
+          if ("transferredAt" in f && f.transferredAt && !existing.transferredAt) {
+            safeFields.transferredAt = f.transferredAt;
+          }
+          if ("duration" in f && typeof f.duration === "number" && f.duration > 0 && (!existing.duration || existing.duration <= 0)) {
+            safeFields.duration = f.duration;
+          }
+          if ("status" in f && typeof f.status === "string") {
+            const currentRank = _PlivoCallService.STATUS_RANK[existing.status ?? ""] ?? -1;
+            const newRank = _PlivoCallService.STATUS_RANK[f.status] ?? -1;
+            if (newRank >= 0 && newRank > currentRank) {
+              safeFields.status = f.status;
+            }
+          }
+          if ("endedAt" in f && f.endedAt && !existing.endedAt) {
+            safeFields.endedAt = f.endedAt;
+          }
+          const existingMetadata = existing.metadata || {};
+          const metadataPatches = {};
+          if (plivoCall.plivoCallUuid && !existingMetadata.plivoCallUuid) {
+            metadataPatches.plivoCallUuid = plivoCall.plivoCallUuid;
+          }
+          const plivoCredId = plivoCall.metadata?.plivoCredentialId;
+          if (plivoCredId && !existingMetadata.plivoCredentialId) {
+            metadataPatches.plivoCredentialId = plivoCredId;
+          }
+          if (!existingMetadata.engine) {
+            metadataPatches.engine = "plivo-openai";
+          }
+          if (Object.keys(metadataPatches).length > 0) {
+            safeFields.metadata = { ...existingMetadata, ...metadataPatches };
+          }
+          if (Object.keys(safeFields).length === 0) return;
+          await db.update(calls).set(safeFields).where(and19(
+            eq26(calls.campaignId, plivoCall.campaignId),
+            eq26(calls.contactId, plivoCall.contactId)
+          ));
+          logger.info(
+            `[PlivoCall] Mirrored fields to calls row for plivo_call ${plivoCallId}: ${Object.keys(safeFields).join(", ")}`,
+            void 0,
+            "PlivoCall"
+          );
+        } catch (err) {
+          logger.error(`[PlivoCall] syncCallsRow failed for plivo_call ${plivoCallId}: ${err.message}`, err, "PlivoCall");
+        }
+      }
+      /**
+       * Re-link any appointments that were stamped with this plivo_call.id to instead
+       * point at the matching canonical calls.id.
+       *
+       * openai-agent-factory writes `appointments.callId = call.id` where `call` is
+       * the plivoCalls row. The reports page joins `appointments.callId = calls.id`,
+       * so without this rewrite appointments made during Plivo calls appear orphaned.
+       */
+      static async relinkAppointmentsForPlivoCall(plivoCallId) {
+        try {
+          const [plivoCall] = await db.select({ campaignId: plivoCalls.campaignId, contactId: plivoCalls.contactId }).from(plivoCalls).where(eq26(plivoCalls.id, plivoCallId)).limit(1);
+          if (!plivoCall || !plivoCall.campaignId || !plivoCall.contactId) return;
+          const [callsRow] = await db.select({ id: calls.id }).from(calls).where(and19(
+            eq26(calls.campaignId, plivoCall.campaignId),
+            eq26(calls.contactId, plivoCall.contactId)
+          )).orderBy(desc9(calls.createdAt)).limit(1);
+          if (!callsRow) return;
+          const updated = await db.update(appointments).set({ callId: callsRow.id, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(appointments.callId, plivoCallId)).returning({ id: appointments.id });
+          if (updated.length > 0) {
+            logger.info(
+              `[PlivoCall] Re-linked ${updated.length} appointment(s) from plivo_call ${plivoCallId} to calls row ${callsRow.id}`,
+              void 0,
+              "PlivoCall"
+            );
+          }
+        } catch (err) {
+          logger.error(`[PlivoCall] relinkAppointmentsForPlivoCall failed for plivo_call ${plivoCallId}: ${err.message}`, err, "PlivoCall");
+        }
+      }
+      /**
        * Handle call recording ready webhook
        */
       static async handleRecordingReady(callId, recordingUrl, duration) {
@@ -20712,6 +20860,7 @@ var init_plivo_call_service = __esm({
           recordingUrl,
           recordingDuration: duration
         }).where(eq26(plivoCalls.id, callId)).returning();
+        await _PlivoCallService.syncCallsRow(callId, { recordingUrl });
         return updatedCall;
       }
       /**
@@ -20791,6 +20940,12 @@ var init_plivo_call_service = __esm({
           nextActions: summary.nextActions || [],
           metadata: updatedMetadata
         }).where(eq26(plivoCalls.id, callId)).returning();
+        await _PlivoCallService.syncCallsRow(callId, {
+          transcript: summary.transcript,
+          aiSummary: summary.aiSummary,
+          classification: summary.leadClassification || this.inferLeadClassification(summary.leadQualityScore),
+          sentiment: summary.sentiment
+        });
         return updatedCall;
       }
       /**
@@ -20812,6 +20967,13 @@ var init_plivo_call_service = __esm({
           transferredTo,
           transferredAt: /* @__PURE__ */ new Date()
         }).where(eq26(plivoCalls.id, callId)).returning();
+        if (updatedCall) {
+          await _PlivoCallService.syncCallsRow(callId, {
+            wasTransferred: true,
+            transferredTo,
+            transferredAt: updatedCall.transferredAt ?? /* @__PURE__ */ new Date()
+          });
+        }
         if (updatedCall && updatedCall.userId) {
           try {
             let contactInfo = null;
@@ -30221,11 +30383,13 @@ var init_campaign_executor = __esm({
               toNumber: contact.phone,
               status: "pending",
               callDirection: "outgoing",
+              engineType: "plivo-openai",
               metadata: {
                 batchCall: true,
                 batchJobId: plivoBatchJobId,
                 agentId: agent.id,
                 telephonyProvider: "plivo",
+                engine: "plivo-openai",
                 contactName: `${contact.firstName} ${contact.lastName || ""}`.trim()
               }
             }));
@@ -39143,13 +39307,13 @@ function getValidatedFrontendUrl() {
       return process.env.APP_URL;
     }
     console.error("[CONFIG ERROR] Production requires APP_DOMAIN or APP_URL to be set");
-    return "http://localhost:5000";
+    return "http://localhost:3000";
   }
   if (process.env.APP_DOMAIN) {
     const domain = stripProtocol(process.env.APP_DOMAIN);
     return `https://${domain}`;
   }
-  return process.env.APP_URL || "http://localhost:5000";
+  return process.env.APP_URL || "http://localhost:3000";
 }
 var FRONTEND_URL = getValidatedFrontendUrl();
 async function recordWebhookReceived(gateway) {
@@ -82801,7 +82965,13 @@ googleSheetsRouter.get("/status", async (req, res) => {
     return;
   }
   const status = await getConnectionStatus(userId);
-  res.json(status);
+  const serverCreds = await getGoogleCredentials();
+  const oauthConfigured = !!serverCreds;
+  res.json({
+    ...status,
+    oauthConfigured,
+    oauthError: oauthConfigured ? void 0 : "Google OAuth client credentials are not configured on this server. Add them in Admin > Settings (or set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars) before users can connect."
+  });
 });
 googleSheetsRouter.delete("/disconnect", async (req, res) => {
   const userId = req.user?.id || req.userId;
@@ -82830,6 +83000,52 @@ googleSheetsRouter.get("/sheets/:spreadsheetId/tabs", async (req, res) => {
   const { spreadsheetId } = req.params;
   const tabs = await listSheetTabs(userId, spreadsheetId);
   res.json(tabs);
+});
+googleSheetsRouter.get("/diagnostics", async (req, res) => {
+  const userId = req.user?.id || req.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const serverCreds = await getGoogleCredentials();
+  const oauthConfigured = !!serverCreds;
+  const oauthSource = serverCreds ? process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "env" : "database" : "none";
+  const [cred] = await db.select({
+    hasRefreshToken: googleSheetsCredentials.refreshToken,
+    tokenExpiry: googleSheetsCredentials.tokenExpiry,
+    connectedEmail: googleSheetsCredentials.connectedEmail
+  }).from(googleSheetsCredentials).where(eq76(googleSheetsCredentials.userId, userId)).limit(1);
+  let probeResult = { ok: false };
+  if (cred) {
+    try {
+      const { refreshAccessToken: refreshAccessToken2 } = await Promise.resolve().then(() => (init_google_sheets_service(), google_sheets_service_exports));
+      const token = await refreshAccessToken2(userId);
+      if (!token) {
+        probeResult = { ok: false, error: "refresh_failed" };
+      } else {
+        const probeResp = await fetch(
+          "https://www.googleapis.com/drive/v3/files?pageSize=1&q=mimeType='application/vnd.google-apps.spreadsheet'&trashed=false&fields=files(id)",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (probeResp.ok) {
+          probeResult = { ok: true, status: probeResp.status };
+        } else {
+          probeResult = { ok: false, status: probeResp.status, error: await probeResp.text() };
+        }
+      }
+    } catch (err) {
+      probeResult = { ok: false, error: err.message };
+    }
+  }
+  res.json({
+    oauthConfigured,
+    oauthSource,
+    hasConnectedAccount: !!cred,
+    connectedEmail: cred?.connectedEmail ?? null,
+    tokenValidUntil: cred?.tokenExpiry ?? null,
+    liveProbe: probeResult,
+    suggestion: !oauthConfigured ? "Configure Google OAuth client credentials (Admin > Settings) or set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET env vars." : !cred ? "User has not connected a Google account yet. Use the Connect button to start OAuth." : !probeResult.ok ? "Refresh token is invalid or revoked. User must disconnect and reconnect their Google account." : "OK \u2014 Google Sheets connection is healthy."
+  });
 });
 
 // server/routes/platform-languages-routes.ts
