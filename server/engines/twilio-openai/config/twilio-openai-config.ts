@@ -23,7 +23,7 @@ export interface TwilioOpenAIConfig {
 export const TWILIO_OPENAI_CONFIG: TwilioOpenAIConfig = {
   openaiRealtimeUrl: 'wss://api.openai.com/v1/realtime',
   openaiRealtimeModel: 'gpt-realtime-1.5',
-  defaultVoice: 'alloy',
+  defaultVoice: 'shimmer',
   defaultTemperature: 0.7,
   webhookTimeout: 15000,
   maxCallDuration: 3600,

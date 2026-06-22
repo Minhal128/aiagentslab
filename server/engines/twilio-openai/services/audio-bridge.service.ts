@@ -185,14 +185,15 @@ export class TwilioOpenAIAudioBridge {
       }
     }
 
-    // VAD configuration with semantic VAD support
-    // Improved defaults for better call quality - less aggressive interruption
+    // VAD configuration — tuned for phone audio (mulaw 8kHz has lower SNR than broadband)
     const vadSettings = agentConfig.vadSettings || {};
     const vadType = vadSettings.type ?? 'server_vad';
-    const vadThreshold = vadSettings.threshold ?? 0.7;
-    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 500;
-    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 900;
-    const vadEagerness = vadSettings.eagerness ?? 'low';
+    // 0.5 threshold is more sensitive — phone audio needs lower threshold to detect speech reliably
+    const vadThreshold = vadSettings.threshold ?? 0.5;
+    // Shorter padding/silence = faster barge-in response
+    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 300;
+    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 500;
+    const vadEagerness = vadSettings.eagerness ?? 'auto';
 
     console.log(`[TwilioOpenAI Bridge] VAD settings: type=${vadType}, threshold=${vadThreshold}, prefix=${vadPrefixPaddingMs}ms, silence=${vadSilenceDurationMs}ms`);
 
@@ -208,43 +209,61 @@ export class TwilioOpenAIAudioBridge {
         threshold: vadThreshold,
         prefix_padding_ms: vadPrefixPaddingMs,
         silence_duration_ms: vadSilenceDurationMs,
+        create_response: true,     // Auto-trigger AI response when user stops speaking
+        interrupt_response: true,  // BARGE-IN: stop AI immediately when user speaks
       };
 
-    // Append mandatory function calling requirements to system prompt
+    // Append mandatory behavioral requirements to every session
     const functionCallingRequirements = `
 
-IMPORTANT FUNCTION CALLING REQUIREMENTS:
-1. After collecting all form information from the user, you MUST call the submit_form function with the collected data. Do NOT just say "I have recorded your information" - you MUST actually call the submit_form function to save the data.
-2. After completing the main task (like form submission), say a friendly closing message and ask if there's anything else. Wait for the user to respond.
-3. Only call the end_call function AFTER the user confirms they are done or says goodbye. Do not hang up immediately after completing a task - give the user a chance to respond.
-4. When the user says goodbye or confirms they are done, THEN call the end_call function to disconnect.
-5. These function calls are MANDATORY. Data will NOT be saved unless you call the functions.
+CONVERSATION FLOW — MANDATORY ORDER:
+You MUST follow these steps on every call. Do NOT skip or reorder them:
+1. GREET the caller warmly by name if known, otherwise say hello and introduce yourself
+2. STATE who you are and which company you represent
+3. BRIEFLY EXPLAIN what the company does and key services/products (1-2 sentences)
+4. ASK how you can help them today — listen to their needs first
+5. ONLY AFTER steps 1-4 are complete should you offer to book a meeting or appointment
+Never jump to booking without completing the introduction. Never assume the caller knows the company.
 
-BACKGROUND NOISE HANDLING:
-- IGNORE background noise, music, TV, radio, or ambient sounds entirely.
-- Only respond to the primary caller's direct speech addressed to you.
-- Do NOT change topics, repeat yourself, or restart based on background conversations or sounds.`;
+LANGUAGE SWITCHING — MANDATORY:
+If the caller speaks Hindi, says "Hindi mein batao", switches to Hinglish, or requests any other language:
+- STOP your current sentence immediately — do NOT finish it
+- Switch to that language in your VERY NEXT word
+- Continue the full conversation in that language from that point
+- Do NOT wait, do NOT say "let me switch", just switch instantly
+
+COMPANY INFORMATION — MANDATORY:
+ALWAYS call lookup_knowledge_base BEFORE stating any facts about the company, products, services, or pricing.
+NEVER guess, assume, or make up company details from memory — this causes incorrect information.
+If the knowledge base returns no result, say "Let me find that information for you" and do not guess.
+
+FUNCTION CALLING REQUIREMENTS:
+1. After collecting all form information, you MUST call submit_form to save the data. Do NOT just say you recorded it.
+2. After completing a task, say a friendly closing and ask if there is anything else. Wait for their response.
+3. Only call end_call AFTER the user confirms they are done or says goodbye.
+4. These function calls are MANDATORY — data is not saved unless you call them.
+
+BACKGROUND NOISE:
+Ignore all background noise, music, TV, or ambient sounds. Only respond to the primary caller speaking directly to you.`;
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
+    // Correct OpenAI Realtime API session.update format.
+    // All fields must be at the TOP LEVEL of session — NOT nested under any 'audio' object.
+    // The previous nested audio.input/audio.output structure was invalid and ignored by OpenAI.
     const sessionConfig = {
       type: 'session.update',
       session: {
-        type: 'realtime',
+        modalities: ['text', 'audio'],
         instructions: enhancedInstructions,
-        audio: {
-          input: {
-            format: { type: 'audio/pcmu' },
-            transcription: { model: 'whisper-1' },
-            turn_detection: turnDetection,
-          },
-          output: {
-            format: { type: 'audio/pcmu' },
-            voice: agentConfig.voice,
-          },
-        },
+        voice: agentConfig.voice,
+        input_audio_format: 'g711_ulaw',
+        output_audio_format: 'g711_ulaw',
+        input_audio_transcription: { model: 'whisper-1' },
+        turn_detection: turnDetection,
         tools,
         tool_choice: tools.length > 0 ? 'auto' : 'none',
+        temperature: agentConfig.temperature ?? 0.7,
       },
     };
 
