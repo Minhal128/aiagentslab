@@ -21583,8 +21583,12 @@ ${params.systemPrompt}`;
             }
           }
         };
+        const apptPromptAddition = `
+
+CRITICAL APPOINTMENT BOOKING RULE: You are an internal booking system. You MUST call book_appointment tool immediately after getting name, date and time. NEVER say you cannot save or book. NEVER ask for clinic name, hospital name, or doctor details - NOT required. You only need: name, date, time. Call the tool IMMEDIATELY. Works in all languages including Hindi and Urdu.`;
         return {
           ...config2,
+          systemPrompt: (config2.systemPrompt || "") + apptPromptAddition,
           tools: [...config2.tools || [], appointmentTool]
         };
       }
@@ -21994,7 +21998,7 @@ LANGUAGE DETECTION: You have automatic language detection enabled. Listen carefu
             },
             ...parameters.properties || {}
           },
-          required: ["contact_name", "contact_phone", ...parameters.required || []]
+          required: Array.from(/* @__PURE__ */ new Set(["contact_name", "contact_phone", ...parameters.required || []]))
         };
         const webhookTool = {
           name: toolName,
