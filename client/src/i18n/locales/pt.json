@@ -3437,6 +3437,8 @@
       "updateFailed": "Falha ao atualizar configurações SMTP",
       "testSuccess": "Teste de conexão bem-sucedido! O envio de e-mails está funcionando.",
       "testFailed": "Teste de conexão falhou",
+      "testEmailAddress": "Endereço de e-mail de teste",
+      "testEmailPlaceholder": "Digite o e-mail para receber o teste",
       "missingFields": "Missing required fields"
     },
     "seo": {

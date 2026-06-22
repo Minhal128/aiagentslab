@@ -3437,6 +3437,8 @@
       "updateFailed": "Nie udało się zaktualizować ustawień SMTP",
       "testSuccess": "Test połączenia pomyślny! Wysyłanie e-maili działa.",
       "testFailed": "Test połączenia nie powiódł się",
+      "testEmailAddress": "Testowy adres e-mail",
+      "testEmailPlaceholder": "Wprowadź adres e-mail do odbioru wiadomości testowej",
       "missingFields": "Missing required fields"
     },
     "seo": {

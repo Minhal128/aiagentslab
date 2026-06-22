@@ -3437,6 +3437,8 @@
       "updateFailed": "Kunde inte uppdatera SMTP-inställningar",
       "testSuccess": "Anslutningstest lyckades! E-postutskick fungerar.",
       "testFailed": "Anslutningstest misslyckades",
+      "testEmailAddress": "Test-e-postadress",
+      "testEmailPlaceholder": "Ange e-postadress för att ta emot testet",
       "missingFields": "Missing required fields"
     },
     "seo": {

@@ -3745,7 +3745,9 @@
       "updateSuccess": "SMTP settings updated successfully",
       "updateFailed": "Failed to update SMTP settings",
       "testSuccess": "Connection test successful! Email sending is working.",
-      "testFailed": "Connection test failed"
+      "testFailed": "Connection test failed",
+      "testEmailAddress": "Test Email Address",
+      "testEmailPlaceholder": "Enter email address to receive test"
     },
     "creditPackages": {
       "title": "Credit Packages",

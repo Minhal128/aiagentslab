@@ -125,6 +125,11 @@ export default function SMTPSettings() {
       setTestResult({ success: false, message: t("admin.smtp.testEmailRequired") || "Test email address is required" });
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(testEmail)) {
+      setTestResult({ success: false, message: "Please enter a valid email address (e.g. you@example.com)" });
+      return;
+    }
     testSMTPMutation.mutate(testEmail);
   };
 

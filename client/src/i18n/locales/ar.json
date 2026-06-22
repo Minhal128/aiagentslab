@@ -3252,6 +3252,8 @@
       "updateFailed": "فشل تحديث إعدادات SMTP",
       "testSuccess": "نجح اختبار الاتصال! إرسال البريد الإلكتروني يعمل.",
       "testFailed": "فشل اختبار الاتصال",
+      "testEmailAddress": "عنوان البريد الإلكتروني للاختبار",
+      "testEmailPlaceholder": "أدخل عنوان البريد الإلكتروني لاستقبال الاختبار",
       "missingFields": "Missing required fields"
     },
     "seo": {

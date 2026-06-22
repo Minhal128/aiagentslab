@@ -3437,6 +3437,8 @@
       "updateFailed": "SMTP सेटिंग्स अपडेट करने में विफल",
       "testSuccess": "कनेक्शन परीक्षण सफल! ईमेल भेजना काम कर रहा है।",
       "testFailed": "कनेक्शन परीक्षण विफल",
+      "testEmailAddress": "परीक्षण ईमेल पता",
+      "testEmailPlaceholder": "परीक्षण प्राप्त करने के लिए ईमेल पता दर्ज करें",
       "missingFields": "Missing required fields"
     },
     "seo": {

@@ -3437,6 +3437,8 @@
       "updateFailed": "SMTP設定の更新に失敗しました",
       "testSuccess": "接続テスト成功！メール送信が機能しています。",
       "testFailed": "接続テストに失敗しました",
+      "testEmailAddress": "テスト用メールアドレス",
+      "testEmailPlaceholder": "テストを受信するメールアドレスを入力してください",
       "missingFields": "Missing required fields"
     },
     "seo": {

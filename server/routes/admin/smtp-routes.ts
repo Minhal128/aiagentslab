@@ -118,8 +118,9 @@ export function registerSmtpRoutes(router: Router) {
         friendlyMessage = 'Authentication failed. Please check your SMTP username and password are correct.';
       } else if (errorCode === 'ESOCKET') {
         friendlyMessage = 'Network error connecting to SMTP server. Please check your server hostname and ensure there are no firewall restrictions.';
-      } else if (errorCode === 'EAI_AGAIN' || errorCode === 'ENOTFOUND') {
-        friendlyMessage = `SMTP server hostname could not be resolved. Please check the hostname "${error.hostname || 'unknown'}" is spelled correctly.`;
+      } else if (errorCode === 'EAI_AGAIN' || errorCode === 'ENOTFOUND' || errorMsg.includes('ENOTFOUND') || errorMsg.includes('getaddrinfo') || errorMsg.includes('EAI_AGAIN')) {
+        const badHost = error.hostname || smtpHost?.value || 'unknown';
+        friendlyMessage = `SMTP server hostname could not be resolved. Please check the hostname "${badHost}" is spelled correctly and that your server can reach it.`;
       } else if (errorMsg.includes('CERT_HAS_EXPIRED') || errorMsg.includes('certificate') || errorMsg.includes('SSL')) {
         friendlyMessage = 'SSL/TLS certificate error. The SMTP server\'s certificate may be expired or invalid.';
       } else if (errorMsg.includes('STARTTLS')) {
