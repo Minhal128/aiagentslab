@@ -454,7 +454,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                     <SelectValue placeholder={
                       agentsLoading
                         ? t("common.loading") || "Loading agents..."
-                        : agents.filter(a => a.type !== 'flow').length === 0
+                        : agents.filter(a => (a.type !== 'flow' || a.telephonyProvider === 'plivo')).length === 0
                           ? t("campaigns.create.noAgentsAvailable")
                           : t("campaigns.create.agentPlaceholder")
                     } />
@@ -469,7 +469,7 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                       agents
                         .filter(agent => {
                           // Exclude flow agents — they require a flow editor
-                          if (agent.type === 'flow') return false;
+                          if (agent.type === 'flow' && agent.telephonyProvider !== 'plivo' && agent.telephonyProvider !== 'plivo_openai') return false;
                           // Always exclude OpenAI SIP agents - they don't support outbound calls
                           if (agent.telephonyProvider === 'openai-sip') {
                             return false;
@@ -488,11 +488,11 @@ export function CreateCampaignDialog({ open, onOpenChange }: CreateCampaignDialo
                     )}
                   </SelectContent>
                 </Select>
-                {!agentsLoading && agents.filter(a => a.type !== 'flow').length === 0 && (
+                {!agentsLoading && agents.filter(a => (a.type !== 'flow' || a.telephonyProvider === 'plivo')).length === 0 && (
                   <p className="text-sm text-muted-foreground">{t("campaigns.create.goToAgentsPage")}</p>
                 )}
-                {!agentsLoading && agents.filter(a => a.type !== 'flow').length > 0 &&
-                 agents.filter(a => a.type !== 'flow').filter(a => {
+                {!agentsLoading && agents.filter(a => (a.type !== 'flow' || a.telephonyProvider === 'plivo')).length > 0 &&
+                 agents.filter(a => (a.type !== 'flow' || a.telephonyProvider === 'plivo')).filter(a => {
                    // Same filter logic as dropdown
                    if (a.telephonyProvider === 'openai-sip') return false;
                    if (a.telephonyProvider === 'elevenlabs-sip' && !isSipPluginEnabled) return false;
