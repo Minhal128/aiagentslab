@@ -374,7 +374,7 @@ export function AgentCreationWizard({ open, onOpenChange, onSuccess }: AgentCrea
       const isSipEngine = formData.telephonyProvider === "elevenlabs-sip" || formData.telephonyProvider === "openai-sip";
       const isOpenAIVoice = formData.telephonyProvider === "plivo" || formData.telephonyProvider === "twilio_openai" || formData.telephonyProvider === "openai-sip";
       const isElevenLabsVoice = formData.telephonyProvider === "twilio" || formData.telephonyProvider === "elevenlabs-sip";
-      
+
       const payload = {
         type: "incoming",
         name: formData.name,
