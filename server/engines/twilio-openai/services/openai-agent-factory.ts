@@ -63,12 +63,15 @@ export class OpenAIAgentFactory {
    * Validate and normalize voice selection
    */
   static validateVoice(voice: string): OpenAIVoice {
-    const validVoice = OPENAI_VOICES.find(v => v.id === voice);
+    // Map display-only voices to actual OpenAI API voices
+    const voiceAliasMap: Record<string, OpenAIVoice> = { arjun: 'echo' };
+    const resolved = voiceAliasMap[voice] ?? voice;
+    const validVoice = OPENAI_VOICES.find(v => v.id === resolved);
     if (!validVoice) {
       console.warn(`[Agent Factory] Invalid voice "${voice}", falling back to "alloy"`);
       return 'alloy';
     }
-    return voice as OpenAIVoice;
+    return resolved as OpenAIVoice;
   }
 
   /**
