@@ -4131,6 +4131,24 @@ export async function handleElevenLabsWebhook(req: Request, res: Response) {
               callId: callRecord.id,
             }).catch(err => console.error(`❌ [Post-Call Messaging] Regular call error: ${err.message}`));
           }).catch(err => console.error(`❌ [Post-Call Messaging] Import error: ${err.message}`));
+
+          // If an appointment was booked during this call, send WhatsApp confirmation now that the call has ended
+          if (callRecord.metadata?.appointmentBooked && callRecord.metadata?.appointmentData) {
+            const apptData = callRecord.metadata.appointmentData as any;
+            if (apptData?.date && apptData?.time) {
+              import('../services/appointment-whatsapp').then(({ sendAppointmentWhatsAppConfirmation }) => {
+                sendAppointmentWhatsAppConfirmation({
+                  userId: callRecord.userId!,
+                  elevenLabsAgentId: agent_id,
+                  callerPhone: callerPhone!,
+                  appointmentDate: apptData.date,
+                  appointmentTime: apptData.time || apptData.appointmentTime,
+                  appointmentId: apptData.appointmentId,
+                  callId: callRecord.id,
+                }).catch(err => console.error(`❌ [Call End] Appointment WhatsApp error: ${err.message}`));
+              }).catch(() => {});
+            }
+          }
         }
       }
 
@@ -4998,10 +5016,10 @@ export async function handleAppointmentToolWebhook(req: Request, res: Response) 
     // Format response date for human readability
     const readableDate = formatDate(parsedDate, 'EEEE, MMMM d, yyyy');
     const readableTime = formatDate(new Date(`2000-01-01T${finalTime}`), 'h:mm a');
-    
+
     const responseTime = Date.now() - startTime;
     console.log(`📅 [Appointment Webhook] ✅ SUCCESS - Response time: ${responseTime}ms`);
-    
+
     return res.json({
       success: true,
       message: `Great! I've booked your appointment for ${readableDate} at ${readableTime}. You'll receive a confirmation shortly.`,

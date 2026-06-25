@@ -55,6 +55,7 @@ const MIGRATIONS = [
   resolve(rootDir, 'migrations', '0003_campaign_contact_retry.sql'),
   resolve(rootDir, 'migrations', '0004_add_missing_tables.sql'),
   resolve(rootDir, 'migrations', '0005_add_missing_agent_messaging_columns.sql'),
+  resolve(rootDir, 'migrations', '0006_add_appointment_doctor_name.sql'),
 ];
 
 /**

@@ -173,6 +173,7 @@ export const agents = pgTable("agents", {
   detectLanguageEnabled: boolean("detect_language_enabled").default(false),
   endConversationEnabled: boolean("end_conversation_enabled").default(false),
   appointmentBookingEnabled: boolean("appointment_booking_enabled").default(false),
+  appointmentDoctorName: text("appointment_doctor_name"),
   messagingEmailEnabled: boolean("messaging_email_enabled").default(false),
   messagingWhatsappEnabled: boolean("messaging_whatsapp_enabled").default(false),
   messagingEmailTemplate: text("messaging_email_template"),

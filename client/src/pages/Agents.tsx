@@ -104,6 +104,7 @@ interface Agent {
   detectLanguageEnabled: boolean | null;
   endConversationEnabled: boolean | null;
   appointmentBookingEnabled: boolean | null;
+  appointmentDoctorName: string | null;
   expressiveMode: boolean | null;
   telephonyProvider: 'twilio' | 'plivo' | 'twilio_openai' | 'elevenlabs-sip' | 'openai-sip' | null;
   openaiVoice: string | null;
@@ -244,6 +245,7 @@ export default function Agents() {
     detectLanguageEnabled: false,
     endConversationEnabled: false,
     appointmentBookingEnabled: false,
+    appointmentDoctorName: "",
     messagingEmailEnabled: false,
     messagingWhatsappEnabled: false,
     messagingEmailTemplate: "",
@@ -582,6 +584,7 @@ export default function Agents() {
       detectLanguageEnabled: false,
       endConversationEnabled: false,
       appointmentBookingEnabled: false,
+      appointmentDoctorName: "",
       messagingEmailEnabled: false,
       messagingWhatsappEnabled: false,
       messagingEmailTemplate: "",
@@ -713,6 +716,7 @@ export default function Agents() {
       detectLanguageEnabled: agent.detectLanguageEnabled ?? false,
       endConversationEnabled: agent.endConversationEnabled ?? false,
       appointmentBookingEnabled: agent.appointmentBookingEnabled ?? false,
+      appointmentDoctorName: (agent as any).appointmentDoctorName || "",
       messagingEmailEnabled: (agent as any).messagingEmailEnabled ?? false,
       messagingWhatsappEnabled: (agent as any).messagingWhatsappEnabled ?? false,
       messagingEmailTemplate: (agent as any).messagingEmailTemplate || "",
@@ -2753,22 +2757,42 @@ export default function Agents() {
 
                 {/* Appointment Booking Toggle - Supported for all agent types */}
                 {(formData.type === "incoming" || formData.type === "flow") && (
-                  <label className="flex items-center gap-3 cursor-pointer" data-testid="label-enable-appointment-booking">
-                    <Checkbox
-                      checked={formData.appointmentBookingEnabled}
-                      onCheckedChange={(checked) => setFormData({ ...formData, appointmentBookingEnabled: checked as boolean })}
-                      data-testid="checkbox-enable-appointment-booking"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-medium">{t('agents.systemTools.enableAppointmentBooking')}</span>
-                        <InfoTooltip content={t('agents.systemTools.appointmentBookingTooltip')} />
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 cursor-pointer" data-testid="label-enable-appointment-booking">
+                      <Checkbox
+                        checked={formData.appointmentBookingEnabled}
+                        onCheckedChange={(checked) => setFormData({ ...formData, appointmentBookingEnabled: checked as boolean })}
+                        data-testid="checkbox-enable-appointment-booking"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-medium">{t('agents.systemTools.enableAppointmentBooking')}</span>
+                          <InfoTooltip content={t('agents.systemTools.appointmentBookingTooltip')} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {t('agents.systemTools.appointmentBookingDescription')}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {t('agents.systemTools.appointmentBookingDescription')}
-                      </p>
-                    </div>
-                  </label>
+                    </label>
+
+                    {/* Doctor Name — used in WhatsApp appointment confirmation ({{3}} template variable) */}
+                    {formData.appointmentBookingEnabled && isWhatsAppActive && formData.messagingWhatsappEnabled && (
+                      <div className="ml-8 space-y-1">
+                        <Label className="text-xs text-muted-foreground block">
+                          {t('agents.systemTools.appointmentDoctorName', "Doctor's Name")}
+                        </Label>
+                        <Input
+                          placeholder={t('agents.systemTools.appointmentDoctorNamePlaceholder', 'e.g. Smith (used as "Dr. Smith" in WhatsApp confirmation)')}
+                          value={formData.appointmentDoctorName}
+                          onChange={(e) => setFormData({ ...formData, appointmentDoctorName: e.target.value })}
+                          data-testid="input-appointment-doctor-name"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {t('agents.systemTools.appointmentDoctorNameDescription', 'Shown as "Doctor: Dr. [name]" in the WhatsApp confirmation. Defaults to the agent name if left blank.')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {hasEmailTemplates && (
