@@ -22793,7 +22793,8 @@ var init_types2 = __esm({
       { id: "sage", name: "Sage", description: "Thoughtful, wise voice" },
       { id: "verse", name: "Verse", description: "Poetic, expressive voice" },
       { id: "cedar", name: "Cedar", description: "Deep, grounded voice" },
-      { id: "marin", name: "Marin", description: "Bright, cheerful voice" }
+      { id: "marin", name: "Marin", description: "Bright, cheerful voice" },
+      { id: "arjun", name: "Arjun", description: "Warm Indian tone" }
     ];
     MODEL_TIER_CONFIG = {
       free: {
@@ -22838,12 +22839,14 @@ var init_openai_agent_factory = __esm({
        * Validate and normalize voice selection
        */
       static validateVoice(voice) {
-        const validVoice = OPENAI_VOICES.find((v) => v.id === voice);
+        const voiceAliasMap = { arjun: "echo" };
+        const resolved = voiceAliasMap[voice] ?? voice;
+        const validVoice = OPENAI_VOICES.find((v) => v.id === resolved);
         if (!validVoice) {
           console.warn(`[Agent Factory] Invalid voice "${voice}", falling back to "alloy"`);
           return "alloy";
         }
-        return voice;
+        return resolved;
       }
       /**
        * Validate and normalize model selection based on tier
@@ -26101,7 +26104,8 @@ var init_types3 = __esm({
       { id: "sage", name: "Sage", description: "Thoughtful, wise voice" },
       { id: "verse", name: "Verse", description: "Poetic, expressive voice" },
       { id: "cedar", name: "Cedar", description: "Deep, grounded voice" },
-      { id: "marin", name: "Marin", description: "Bright, cheerful voice" }
+      { id: "marin", name: "Marin", description: "Bright, cheerful voice" },
+      { id: "arjun", name: "Arjun", description: "Warm Indian tone" }
     ];
     MODEL_TIER_CONFIG2 = {
       free: {
@@ -26146,12 +26150,14 @@ var init_openai_agent_factory2 = __esm({
        * Validate and normalize voice selection
        */
       static validateVoice(voice) {
-        const validVoice = OPENAI_VOICES2.find((v) => v.id === voice);
+        const voiceAliasMap = { arjun: "echo" };
+        const resolved = voiceAliasMap[voice] ?? voice;
+        const validVoice = OPENAI_VOICES2.find((v) => v.id === resolved);
         if (!validVoice) {
           console.warn(`[Agent Factory] Invalid voice "${voice}", falling back to "alloy"`);
           return "alloy";
         }
-        return voice;
+        return resolved;
       }
       /**
        * Validate and normalize model selection based on tier
@@ -49484,7 +49490,7 @@ function registerSmtpRoutes(router24) {
         friendlyMessage = "Authentication failed. Please check your SMTP username and password are correct.";
       } else if (errorCode === "ESOCKET") {
         friendlyMessage = "Network error connecting to SMTP server. Please check your server hostname and ensure there are no firewall restrictions.";
-      } else if (errorCode === "EAI_AGAIN" || errorCode === "ENOTFOUND" || errorMsg.includes("ENOTFOUND") || errorMsg.includes("getaddrinfo") || errorMsg.includes("EAI_AGAIN")) {
+      } else if (errorCode === "EAI_AGAIN" || errorCode === "ENOTFOUND" || errorCode === "EDNS" || errorMsg.includes("ENOTFOUND") || errorMsg.includes("getaddrinfo") || errorMsg.includes("EAI_AGAIN") || errorMsg.includes("EDNS")) {
         const badHost = error.hostname || smtpHost?.value || "unknown";
         friendlyMessage = `SMTP server hostname could not be resolved. Please check the hostname "${badHost}" is spelled correctly and that your server can reach it.`;
       } else if (errorMsg.includes("CERT_HAS_EXPIRED") || errorMsg.includes("certificate") || errorMsg.includes("SSL")) {
@@ -49492,7 +49498,8 @@ function registerSmtpRoutes(router24) {
       } else if (errorMsg.includes("STARTTLS")) {
         friendlyMessage = "The SMTP server requires a secure connection (STARTTLS) but failed to upgrade. Try using port 465 with SSL instead.";
       }
-      res.status(500).json({
+      res.json({
+        success: false,
         error: friendlyMessage,
         details: errorMsg,
         code: errorCode
