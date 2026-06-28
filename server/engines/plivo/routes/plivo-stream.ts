@@ -711,6 +711,33 @@ async function initializeSession(
       }
     }
 
+    // Safety net: if system prompt mentions book_appointment but tool was never registered
+    // (happens when call.metadata.tools is empty but agent system prompt uses the tool)
+    if (
+      agentConfig.systemPrompt?.includes('book_appointment') &&
+      !agentConfig.tools.some(t => t.name === 'book_appointment')
+    ) {
+      const callerPhone = call.callDirection === 'inbound' ? call.fromNumber : call.toNumber;
+      let safetyConfig = OpenAIAgentFactory.createAgentConfig({
+        voice: agentConfig.voice as OpenAIVoice,
+        model: agentConfig.model as OpenAIRealtimeModel,
+        systemPrompt: agentConfig.systemPrompt,
+        firstMessage: agentConfig.firstMessage,
+        userTier,
+        toolContext: { userId: call.userId || '', agentId: call.agentId || '', callId: call.id },
+      });
+      safetyConfig.tools = agentConfig.tools;
+      safetyConfig = OpenAIAgentFactory.addAppointmentTool(
+        safetyConfig,
+        call.userId || '',
+        call.agentId || '',
+        call.id,
+        callerPhone || undefined
+      );
+      agentConfig.tools = safetyConfig.tools;
+      logger.info(`[PlivoStream] Auto-added book_appointment handler (system prompt references it but tool was missing)`, undefined, 'PlivoStream');
+    }
+
     // Get Plivo credential ID from metadata for transfer functionality
     const metadata = call.metadata as Record<string, unknown> | null;
     const plivoCredentialId = metadata?.plivoCredentialId as string | undefined;

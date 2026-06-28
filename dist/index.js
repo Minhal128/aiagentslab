@@ -3601,7 +3601,7 @@ var init_storage = __esm({
         }));
       }
       async getUserContactsDeduplicated(userId) {
-        const normalizePhone3 = (phone) => {
+        const normalizePhone2 = (phone) => {
           let cleaned = phone.replace(/[\s\-\(\)\.]/g, "");
           if (cleaned.startsWith("00")) cleaned = "+" + cleaned.slice(2);
           if (!cleaned.startsWith("+") && cleaned.length >= 10) cleaned = "+" + cleaned;
@@ -3617,7 +3617,7 @@ var init_storage = __esm({
         const phoneGroups = /* @__PURE__ */ new Map();
         for (const result of results) {
           const { contact, campaign } = result;
-          const phone = normalizePhone3(contact.phone);
+          const phone = normalizePhone2(contact.phone);
           if (!phoneGroups.has(phone)) {
             phoneGroups.set(phone, {
               phone,
@@ -3672,7 +3672,7 @@ var init_storage = __esm({
         for (const call of callsWithoutContacts) {
           const rawPhone = call.phoneNumber;
           if (!rawPhone || rawPhone === "Unknown Caller" || rawPhone === "unknown") continue;
-          const phone = normalizePhone3(rawPhone);
+          const phone = normalizePhone2(rawPhone);
           const callStatus = call.callDirection === "incoming" ? "incoming_call" : "outgoing_call";
           if (!phoneGroups.has(phone)) {
             phoneGroups.set(phone, {
@@ -3713,7 +3713,7 @@ var init_storage = __esm({
         }).from(leads).where(eq2(leads.userId, userId)).orderBy(desc2(leads.createdAt));
         for (const lead of leadsResults) {
           if (!lead.phone || lead.phone === "Unknown Caller" || lead.phone === "unknown") continue;
-          const phone = normalizePhone3(lead.phone);
+          const phone = normalizePhone2(lead.phone);
           const leadStatus = `lead_${lead.stage || "new"}`;
           const leadSource = lead.sourceType === "campaign" ? "campaign" : "call";
           if (!phoneGroups.has(phone)) {
@@ -3776,7 +3776,7 @@ var init_storage = __esm({
         for (const call of twilioOpenaiCallsResults) {
           const rawTwPhone = call.callDirection === "inbound" ? call.fromNumber : call.toNumber;
           if (!rawTwPhone || rawTwPhone === "Unknown Caller" || rawTwPhone === "unknown") continue;
-          const phone = normalizePhone3(rawTwPhone);
+          const phone = normalizePhone2(rawTwPhone);
           const callStatus = call.callDirection === "inbound" ? "incoming_call" : "outgoing_call";
           if (!phoneGroups.has(phone)) {
             phoneGroups.set(phone, {
@@ -3817,7 +3817,7 @@ var init_storage = __esm({
         for (const call of plivoCallsResults) {
           const rawPlPhone = call.callDirection === "inbound" ? call.fromNumber : call.toNumber;
           if (!rawPlPhone || rawPlPhone === "Unknown Caller" || rawPlPhone === "unknown") continue;
-          const phone = normalizePhone3(rawPlPhone);
+          const phone = normalizePhone2(rawPlPhone);
           const callStatus = call.callDirection === "inbound" ? "incoming_call" : "outgoing_call";
           if (!phoneGroups.has(phone)) {
             phoneGroups.set(phone, {
@@ -3858,7 +3858,7 @@ var init_storage = __esm({
         for (const call of sipCallsResults) {
           const rawSipPhone = call.direction === "inbound" ? call.fromNumber : call.toNumber;
           if (!rawSipPhone || rawSipPhone === "Unknown Caller" || rawSipPhone === "unknown") continue;
-          const phone = normalizePhone3(rawSipPhone);
+          const phone = normalizePhone2(rawSipPhone);
           const callStatus = call.direction === "inbound" ? "incoming_call" : "outgoing_call";
           if (!phoneGroups.has(phone)) {
             phoneGroups.set(phone, {
@@ -12945,7 +12945,7 @@ var init_email_service = __esm({
           const user = this.cleanDbValue(userSetting?.value);
           const pass = this.cleanDbValue(passSetting?.value);
           const fromEmail = this.cleanDbValue(fromEmailSetting?.value);
-          const fromName2 = this.cleanDbValue(fromNameSetting?.value);
+          const fromName = this.cleanDbValue(fromNameSetting?.value);
           if (host && port && user && pass) {
             const portNum = typeof port === "string" ? parseInt(port, 10) : port;
             this.transporter = nodemailer.createTransport({
@@ -12968,7 +12968,7 @@ var init_email_service = __esm({
             });
             this.smtpConfigured = true;
             this.fromAddress = this.extractRawEmail(fromEmail) || user || "";
-            this.fromName = fromName2 || "";
+            this.fromName = fromName || "";
             logger.info("Email service reinitialized from database settings", { fromAddress: this.fromAddress, fromName: this.fromName }, SOURCE);
             return true;
           }
@@ -13056,16 +13056,16 @@ var init_email_service = __esm({
         }
         const branding = await getBrandingSettings();
         const rawFromAddress = this.extractRawEmail(this.fromAddress) || this.fromAddress;
-        const fromAddress2 = rawFromAddress || branding.fromEmail || process.env.SMTP_USER || "";
-        if (!fromAddress2) {
+        const fromAddress = rawFromAddress || branding.fromEmail || process.env.SMTP_USER || "";
+        if (!fromAddress) {
           const error = "No from address configured (SMTP_FROM or SMTP_USER required)";
           logger.error(`[EMAIL ERROR] ${error}`, void 0, SOURCE);
           console.log(`\u274C [Email] ${error}`);
           return { success: false, error };
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(fromAddress2)) {
-          const error = `Invalid from address format: ${fromAddress2}. Must be a valid email address.`;
+        if (!emailRegex.test(fromAddress)) {
+          const error = `Invalid from address format: ${fromAddress}. Must be a valid email address.`;
           logger.error(`[EMAIL ERROR] ${error}`, void 0, SOURCE);
           console.log(`\u274C [Email] ${error}`);
           return { success: false, error };
@@ -13075,7 +13075,7 @@ var init_email_service = __esm({
         const textBody = options?.text || htmlToText(html);
         try {
           const mailOptions = {
-            from: `"${displayName}" <${fromAddress2}>`,
+            from: `"${displayName}" <${fromAddress}>`,
             to,
             subject,
             html,
@@ -13088,7 +13088,7 @@ var init_email_service = __esm({
           if (options?.replyTo) {
             mailOptions.replyTo = options.replyTo;
           }
-          console.log(`\u{1F4E7} [Email] Sending to: ${to}, Subject: "${subject}", From: ${fromAddress2}${options?.replyTo ? `, Reply-To: ${options.replyTo}` : ""}`);
+          console.log(`\u{1F4E7} [Email] Sending to: ${to}, Subject: "${subject}", From: ${fromAddress}${options?.replyTo ? `, Reply-To: ${options.replyTo}` : ""}`);
           const retryableCodes = /* @__PURE__ */ new Set(["ETIMEDOUT", "ECONNRESET", "ECONNREFUSED", "ESOCKET", "EAI_AGAIN"]);
           const maxRetries = 2;
           let lastError = null;
@@ -18307,1577 +18307,12 @@ var init_lead_processor_service = __esm({
   }
 });
 
-// plugins/messaging/services/messaging-log.service.ts
-import { sql as sql13 } from "drizzle-orm";
-function snakeToCamel(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-function transformRow(row) {
-  const transformed = {};
-  for (const key of Object.keys(row)) {
-    transformed[snakeToCamel(key)] = row[key];
-  }
-  return transformed;
-}
-var MessagingLogService, messagingLogService;
-var init_messaging_log_service = __esm({
-  "plugins/messaging/services/messaging-log.service.ts"() {
-    "use strict";
-    init_db();
-    MessagingLogService = class {
-      async logMessage(userId, channel, data) {
-        const result = await db.execute(sql13`
-      INSERT INTO messaging_logs (user_id, call_id, agent_id, channel, recipient_phone, recipient_email, template_name, status, response_data, error_message, message_content, message_type)
-      VALUES (${userId}, ${data.callId || null}, ${data.agentId || null}, ${channel}, ${data.recipientPhone || null}, ${data.recipientEmail || null}, ${data.templateName}, ${data.status}, ${data.responseData ? JSON.stringify(data.responseData) : null}::jsonb, ${data.errorMessage || null}, ${data.messageContent || null}, ${data.messageType || null})
-      RETURNING *
-    `);
-        return transformRow(result.rows[0]);
-      }
-      async getLogs(userId, filters = {}) {
-        const limit = filters.limit || 50;
-        const offset = filters.offset || 0;
-        const channel = filters.channel && ["email", "whatsapp"].includes(filters.channel) ? filters.channel : null;
-        const status = filters.status && ["sent", "failed", "pending"].includes(filters.status) ? filters.status : null;
-        const countResult = await db.execute(sql13`
-      SELECT COUNT(*) as total FROM messaging_logs
-      WHERE user_id = ${userId}
-        AND (${channel}::text IS NULL OR channel = ${channel})
-        AND (${status}::text IS NULL OR status = ${status})
-    `);
-        const result = await db.execute(sql13`
-      SELECT * FROM messaging_logs
-      WHERE user_id = ${userId}
-        AND (${channel}::text IS NULL OR channel = ${channel})
-        AND (${status}::text IS NULL OR status = ${status})
-      ORDER BY created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `);
-        const total = parseInt(countResult.rows[0]?.total || "0", 10);
-        const logs = result.rows.map((row) => transformRow(row));
-        return { logs, total };
-      }
-      async getAdminLogs(filters = {}) {
-        const limit = filters.limit || 50;
-        const offset = filters.offset || 0;
-        const channel = filters.channel && ["email", "whatsapp"].includes(filters.channel) ? filters.channel : null;
-        const status = filters.status && ["sent", "failed", "pending"].includes(filters.status) ? filters.status : null;
-        const countResult = await db.execute(sql13`
-      SELECT COUNT(*) as total FROM messaging_logs
-      WHERE (${channel}::text IS NULL OR channel = ${channel})
-        AND (${status}::text IS NULL OR status = ${status})
-    `);
-        const result = await db.execute(sql13`
-      SELECT ml.*, u.name as user_name, u.email as user_email
-      FROM messaging_logs ml
-      LEFT JOIN users u ON ml.user_id = u.id
-      WHERE (${channel}::text IS NULL OR ml.channel = ${channel})
-        AND (${status}::text IS NULL OR ml.status = ${status})
-      ORDER BY ml.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `);
-        const total = parseInt(countResult.rows[0]?.total || "0", 10);
-        const logs = result.rows.map((row) => ({
-          ...transformRow(row),
-          userName: row.user_name || row.user_email || row.user_id
-        }));
-        return { logs, total };
-      }
-      async getStats() {
-        const result = await db.execute(sql13`
-      SELECT
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'sent') as success_count,
-        COUNT(*) FILTER (WHERE status = 'failed') as failed_count,
-        COUNT(*) FILTER (WHERE channel = 'email') as email_count,
-        COUNT(*) FILTER (WHERE channel = 'whatsapp') as whatsapp_count
-      FROM messaging_logs
-    `);
-        const row = result.rows[0];
-        const total = parseInt(row?.total || "0", 10);
-        const successCount = parseInt(row?.success_count || "0", 10);
-        const failedCount = parseInt(row?.failed_count || "0", 10);
-        return {
-          totalSent: total,
-          totalFailed: failedCount,
-          successCount,
-          failedCount,
-          emailCount: parseInt(row?.email_count || "0", 10),
-          whatsappCount: parseInt(row?.whatsapp_count || "0", 10),
-          successRate: total > 0 ? successCount / total * 100 : 0
-        };
-      }
-    };
-    messagingLogService = new MessagingLogService();
-  }
-});
-
-// plugins/messaging/services/meta-whatsapp.service.ts
-var meta_whatsapp_service_exports = {};
-__export(meta_whatsapp_service_exports, {
-  MetaWhatsAppService: () => MetaWhatsAppService,
-  metaWhatsAppService: () => metaWhatsAppService
-});
-import { sql as sql14 } from "drizzle-orm";
-function snakeToCamel2(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-function transformRow2(row) {
-  const transformed = {};
-  for (const key of Object.keys(row)) {
-    transformed[snakeToCamel2(key)] = row[key];
-  }
-  return transformed;
-}
-function validatePhoneNumber(phone) {
-  if (!/^[+\d]/.test(phone)) {
-    throw new Error("Invalid phone number format. Use international format (e.g., +1234567890).");
-  }
-  const stripped = phone.replace(/[^0-9+]/g, "");
-  const digits = stripped.replace(/\+/g, "");
-  if (digits.length < 7) {
-    throw new Error("Invalid phone number format. Use international format (e.g., +1234567890).");
-  }
-}
-var META_GRAPH_API_BASE, META_API_VERSION, MetaWhatsAppService, metaWhatsAppService;
-var init_meta_whatsapp_service = __esm({
-  "plugins/messaging/services/meta-whatsapp.service.ts"() {
-    "use strict";
-    init_db();
-    init_messaging_log_service();
-    META_GRAPH_API_BASE = "https://graph.facebook.com";
-    META_API_VERSION = process.env.META_WHATSAPP_API_VERSION || "v21.0";
-    MetaWhatsAppService = class {
-      async getSettings(userId) {
-        const result = await db.execute(sql14`
-      SELECT * FROM meta_whatsapp_settings WHERE user_id = ${userId} LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow2(row) : null;
-      }
-      async saveSettings(userId, data) {
-        const result = await db.execute(sql14`
-      INSERT INTO meta_whatsapp_settings (user_id, phone_number_id, waba_id, access_token)
-      VALUES (${userId}, ${data.phoneNumberId}, ${data.wabaId}, ${data.accessToken})
-      ON CONFLICT (user_id) DO UPDATE SET
-        phone_number_id = EXCLUDED.phone_number_id,
-        waba_id = EXCLUDED.waba_id,
-        access_token = EXCLUDED.access_token,
-        updated_at = NOW()
-      RETURNING *
-    `);
-        return transformRow2(result.rows[0]);
-      }
-      async _attemptRegister(phoneNumberId, accessToken2, includePin) {
-        const url = `${META_GRAPH_API_BASE}/${META_API_VERSION}/${phoneNumberId}/register`;
-        const body = { messaging_product: "whatsapp" };
-        if (includePin) body.pin = "123456";
-        console.log(`[Meta WhatsApp] POST ${url} (pin=${includePin})`);
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken2}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(body)
-        });
-        const data = await response.json();
-        console.log(`[Meta WhatsApp] Register response (${response.status}):`, JSON.stringify(data));
-        return { ok: response.ok, data, status: response.status };
-      }
-      async registerPhoneNumber(phoneNumberId, accessToken2) {
-        try {
-          console.log(`[Meta WhatsApp] Registering phone number ${phoneNumberId} with Cloud API`);
-          let result = await this._attemptRegister(phoneNumberId, accessToken2, false);
-          if (!result.ok) {
-            console.log(`[Meta WhatsApp] Register without pin failed (${result.data?.error?.code}), retrying with pin...`);
-            result = await this._attemptRegister(phoneNumberId, accessToken2, true);
-          }
-          if (!result.ok) {
-            console.log(`[Meta WhatsApp] Both attempts failed, waiting 3s before final retry...`);
-            await new Promise((resolve3) => setTimeout(resolve3, 3e3));
-            result = await this._attemptRegister(phoneNumberId, accessToken2, true);
-          }
-          if (!result.ok) {
-            const errMsg = result.data?.error?.message || JSON.stringify(result.data);
-            console.error(`[Meta WhatsApp] Phone registration failed after all attempts:`, {
-              code: result.data?.error?.code,
-              subcode: result.data?.error?.error_subcode,
-              type: result.data?.error?.type,
-              message: result.data?.error?.message,
-              fbtrace_id: result.data?.error?.fbtrace_id
-            });
-            return { success: false, error: errMsg };
-          }
-          console.log(`[Meta WhatsApp] Phone number ${phoneNumberId} registered successfully`);
-          return { success: true };
-        } catch (error) {
-          console.error(`[Meta WhatsApp] Phone registration error:`, error.message);
-          return { success: false, error: error.message };
-        }
-      }
-      async overrideCallbackUrl(phoneNumberId, accessToken2, callbackUrl, verifyToken) {
-        try {
-          const url = `${META_GRAPH_API_BASE}/${META_API_VERSION}/${phoneNumberId}/override_callback_url`;
-          console.log(`[Meta WhatsApp] Setting override callback URL for phone ${phoneNumberId}`);
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${accessToken2}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              callback_url: callbackUrl,
-              verify_token: verifyToken
-            })
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            console.error(`[Meta WhatsApp] Override callback URL failed:`, data?.error?.message || JSON.stringify(data));
-            return false;
-          }
-          console.log(`[Meta WhatsApp] Override callback URL set successfully for phone ${phoneNumberId}`);
-          return true;
-        } catch (error) {
-          console.error(`[Meta WhatsApp] Override callback URL error:`, error.message);
-          return false;
-        }
-      }
-      async subscribeWabaToWebhooks(wabaId, accessToken2) {
-        try {
-          const url = `${META_GRAPH_API_BASE}/${META_API_VERSION}/${wabaId}/subscribed_apps`;
-          console.log(`[Meta WhatsApp] Subscribing WABA ${wabaId} to webhook events`);
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${accessToken2}`
-            }
-          });
-          const data = await response.json();
-          if (!response.ok) {
-            console.error(`[Meta WhatsApp] WABA subscription failed:`, data?.error?.message || JSON.stringify(data));
-            return false;
-          }
-          console.log(`[Meta WhatsApp] WABA ${wabaId} subscribed to webhooks successfully`);
-          return true;
-        } catch (error) {
-          console.error(`[Meta WhatsApp] WABA subscription error:`, error.message);
-          return false;
-        }
-      }
-      async deactivate(userId) {
-        await db.execute(sql14`
-      UPDATE meta_whatsapp_settings SET is_active = false, updated_at = NOW() WHERE user_id = ${userId}
-    `);
-      }
-      async deleteSettings(userId) {
-        await db.execute(sql14`
-      DELETE FROM meta_whatsapp_settings WHERE user_id = ${userId}
-    `);
-      }
-      async getCredentials(userId, skipActiveCheck = false) {
-        const settings = await this.getSettings(userId);
-        if (!settings) {
-          throw new Error("Meta WhatsApp not configured. Please add your WABA credentials first.");
-        }
-        if (!skipActiveCheck && !settings.isActive) {
-          throw new Error("Meta WhatsApp integration is disabled.");
-        }
-        return {
-          phoneNumberId: settings.phoneNumberId,
-          wabaId: settings.wabaId,
-          accessToken: settings.accessToken
-        };
-      }
-      async makeRequest(userId, method, path23, body, skipActiveCheck = false) {
-        const { accessToken: accessToken2 } = await this.getCredentials(userId, skipActiveCheck);
-        const url = `${META_GRAPH_API_BASE}/${META_API_VERSION}${path23}`;
-        const headers = {
-          "Authorization": `Bearer ${accessToken2}`,
-          "Content-Type": "application/json"
-        };
-        const options = { method, headers };
-        if (body) {
-          options.body = JSON.stringify(body);
-        }
-        console.log(`[Meta WhatsApp] ${method} ${url}`);
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "Unknown error");
-          let errorMessage = `Meta WhatsApp API error (${response.status})`;
-          try {
-            const errorJson = JSON.parse(errorText);
-            const metaError = errorJson?.error;
-            if (metaError) {
-              console.error(`[Meta WhatsApp] API Error Details:`, JSON.stringify({
-                code: metaError.code,
-                subcode: metaError.error_subcode,
-                type: metaError.type,
-                message: metaError.message,
-                fbtrace_id: metaError.fbtrace_id,
-                error_data: metaError.error_data,
-                httpStatus: response.status
-              }));
-            }
-          } catch {
-          }
-          if (response.status === 401 || response.status === 190) {
-            errorMessage = "Invalid or expired Meta access token";
-          } else if (response.status === 403) {
-            errorMessage = "Insufficient permissions. Ensure your token has whatsapp_business_management and whatsapp_business_messaging permissions.";
-          } else if (response.status === 429) {
-            errorMessage = "Meta API rate limit exceeded. Please try again later.";
-          } else {
-            try {
-              const errorJson = JSON.parse(errorText);
-              const metaError = errorJson?.error;
-              if (metaError?.code === 131047) {
-                errorMessage = "Cannot send text message: the 24-hour customer service window has closed. Use a template message instead.";
-              } else if (metaError?.code === 131026) {
-                errorMessage = "Message could not be delivered. The recipient may have blocked messages or the number is invalid.";
-              } else if (metaError?.message) {
-                errorMessage = metaError.message;
-              }
-            } catch {
-              errorMessage = `${errorMessage}: ${errorText}`;
-            }
-          }
-          throw new Error(errorMessage);
-        }
-        return response.json();
-      }
-      async testConnection(userId, skipActiveCheck = false) {
-        const { phoneNumberId } = await this.getCredentials(userId, skipActiveCheck);
-        const response = await this.makeRequest(
-          userId,
-          "GET",
-          `/${phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`,
-          void 0,
-          skipActiveCheck
-        );
-        return {
-          businessName: response.verified_name || response.display_phone_number || "Meta WhatsApp",
-          phoneNumber: response.display_phone_number || ""
-        };
-      }
-      async getChannelHealth(userId) {
-        const { phoneNumberId } = await this.getCredentials(userId);
-        const fields = "display_phone_number,verified_name,quality_rating,account_mode,code_verification_status,name_status,messaging_limit_tier,throughput";
-        const response = await this.makeRequest(
-          userId,
-          "GET",
-          `/${phoneNumberId}?fields=${fields}`
-        );
-        return {
-          accountMode: response.account_mode || "UNKNOWN",
-          qualityRating: response.quality_rating || "UNKNOWN",
-          messagingLimit: response.messaging_limit_tier || "UNKNOWN",
-          throughput: response.throughput?.level || "STANDARD",
-          verification: response.code_verification_status || "UNKNOWN",
-          nameStatus: response.name_status || "UNKNOWN",
-          phoneNumber: response.display_phone_number || "",
-          businessName: response.verified_name || "",
-          lastChecked: (/* @__PURE__ */ new Date()).toISOString()
-        };
-      }
-      async getTemplates(userId) {
-        const { wabaId, accessToken: accessToken2 } = await this.getCredentials(userId);
-        const MAX_PAGES = 10;
-        const templates = [];
-        const firstResponse = await this.makeRequest(
-          userId,
-          "GET",
-          `/${wabaId}/message_templates?fields=name,status,category,language,components&limit=100`
-        );
-        const appendApproved = (data) => {
-          for (const tmpl of data) {
-            if (tmpl.status === "APPROVED") {
-              templates.push({
-                name: tmpl.name,
-                status: tmpl.status,
-                language: tmpl.language,
-                category: tmpl.category || "",
-                components: tmpl.components || []
-              });
-            }
-          }
-        };
-        appendApproved(firstResponse?.data || []);
-        let nextUrl = firstResponse?.paging?.next;
-        let pageCount = 1;
-        while (nextUrl && pageCount < MAX_PAGES) {
-          pageCount++;
-          console.log(`[Meta WhatsApp] Fetching templates page ${pageCount}: ${nextUrl}`);
-          const response = await fetch(nextUrl, {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${accessToken2}`,
-              "Content-Type": "application/json"
-            }
-          });
-          if (!response.ok) {
-            console.log(`[Meta WhatsApp] Failed to fetch templates page ${pageCount}: ${response.status}`);
-            break;
-          }
-          const json = await response.json();
-          appendApproved(json?.data || []);
-          nextUrl = json?.paging?.next;
-        }
-        console.log(`[Meta WhatsApp] Fetched ${templates.length} approved templates across ${pageCount} page(s)`);
-        return templates;
-      }
-      async getTemplateByName(userId, templateName) {
-        try {
-          const templates = await this.getTemplates(userId);
-          return templates.find((t) => t.name === templateName) || null;
-        } catch (error) {
-          console.warn(`[Meta WhatsApp] Failed to fetch template "${templateName}": ${error.message}`);
-          return null;
-        }
-      }
-      static buildButtonComponents(templateComponents, buttonOverrides) {
-        const buttonComponents = [];
-        const buttonsComponent = templateComponents.find(
-          (c) => c.type === "BUTTONS" || c.type === "buttons"
-        );
-        if (!buttonsComponent || !Array.isArray(buttonsComponent.buttons)) return buttonComponents;
-        buttonsComponent.buttons.forEach((btn, index2) => {
-          if (btn.type === "URL" && btn.url && btn.url.includes("{{")) {
-            const overrideValue = buttonOverrides?.[index2];
-            buttonComponents.push({
-              type: "button",
-              sub_type: "url",
-              index: String(index2),
-              parameters: [{
-                type: "text",
-                text: overrideValue || (Array.isArray(btn.example) ? btn.example[0] : null) || "details"
-              }]
-            });
-          }
-        });
-        return buttonComponents;
-      }
-      async sendTemplate(userId, to, templateName, language, components = [], meta) {
-        validatePhoneNumber(to);
-        const { phoneNumberId } = await this.getCredentials(userId);
-        const payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: to.replace(/[^0-9]/g, ""),
-          type: "template",
-          template: {
-            name: templateName,
-            language: {
-              code: language || "en_US"
-            }
-          }
-        };
-        if (components && components.length > 0) {
-          payload.template.components = components;
-        }
-        try {
-          const response = await this.makeRequest(userId, "POST", `/${phoneNumberId}/messages`, payload);
-          const messageId = response?.messages?.[0]?.id || "";
-          const messageStatus = response?.messages?.[0]?.message_status || "accepted";
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName,
-            status: "sent",
-            responseData: response,
-            messageContent: `Template: ${templateName}`,
-            messageType: "template"
-          });
-          console.log(`[Meta WhatsApp] Template "${templateName}" sent to ${to} (${messageId})`);
-          return { messageId, status: messageStatus };
-        } catch (error) {
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName,
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: `Template: ${templateName}`,
-            messageType: "template"
-          });
-          console.log(`[Meta WhatsApp] Failed to send template "${templateName}" to ${to}: ${error.message}`);
-          throw error;
-        }
-      }
-      async markMessageRead(userId, metaMessageId) {
-        try {
-          const { phoneNumberId } = await this.getCredentials(userId);
-          await this.makeRequest(userId, "POST", `/${phoneNumberId}/messages`, {
-            messaging_product: "whatsapp",
-            status: "read",
-            message_id: metaMessageId
-          });
-        } catch (error) {
-          console.log(`[Meta WhatsApp] Failed to send read receipt for ${metaMessageId}: ${error.message}`);
-        }
-      }
-      async sendReply(userId, to, message, meta) {
-        validatePhoneNumber(to);
-        const { phoneNumberId } = await this.getCredentials(userId);
-        const payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: to.replace(/[^0-9]/g, ""),
-          type: "text",
-          text: {
-            preview_url: false,
-            body: message
-          }
-        };
-        try {
-          const response = await this.makeRequest(userId, "POST", `/${phoneNumberId}/messages`, payload);
-          const messageId = response?.messages?.[0]?.id || "";
-          const messageStatus = response?.messages?.[0]?.message_status || "accepted";
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName: "reply",
-            status: "sent",
-            responseData: response,
-            messageContent: message.substring(0, 200),
-            messageType: "text"
-          });
-          console.log(`[Meta WhatsApp] Reply sent to ${to} (${messageId})`);
-          return { messageId, status: messageStatus };
-        } catch (error) {
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName: "reply",
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: message.substring(0, 200),
-            messageType: "text"
-          });
-          throw error;
-        }
-      }
-      async uploadMedia(userId, fileBuffer, mimeType, filename) {
-        const { phoneNumberId, accessToken: accessToken2 } = await this.getCredentials(userId);
-        const url = `${META_GRAPH_API_BASE}/${META_API_VERSION}/${phoneNumberId}/media`;
-        const formData = new FormData();
-        formData.append("messaging_product", "whatsapp");
-        formData.append("type", mimeType);
-        formData.append("file", new Blob([fileBuffer], { type: mimeType }), filename);
-        console.log(`[Meta WhatsApp] Uploading media: ${filename} (${mimeType}, ${fileBuffer.length} bytes)`);
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${accessToken2}` },
-          body: formData
-        });
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "Unknown error");
-          throw new Error(`Media upload failed (${response.status}): ${errorText}`);
-        }
-        const json = await response.json();
-        const mediaId = json?.id;
-        if (!mediaId) {
-          throw new Error("Media upload succeeded but no media ID returned");
-        }
-        console.log(`[Meta WhatsApp] Media uploaded: ${mediaId}`);
-        return mediaId;
-      }
-      async getMediaStream(userId, mediaId) {
-        const { accessToken: accessToken2 } = await this.getCredentials(userId);
-        const metaRes = await fetch(`${META_GRAPH_API_BASE}/${META_API_VERSION}/${mediaId}`, {
-          headers: { "Authorization": `Bearer ${accessToken2}` }
-        });
-        if (!metaRes.ok) {
-          throw new Error(`Failed to get media URL (${metaRes.status})`);
-        }
-        const metaJson = await metaRes.json();
-        const downloadUrl = metaJson.url;
-        if (!downloadUrl) throw new Error("No download URL returned for media");
-        const mediaRes = await fetch(downloadUrl, {
-          headers: { "Authorization": `Bearer ${accessToken2}` }
-        });
-        if (!mediaRes.ok) {
-          throw new Error(`Failed to download media (${mediaRes.status})`);
-        }
-        const contentType = mediaRes.headers.get("content-type") || "application/octet-stream";
-        const contentLength = mediaRes.headers.get("content-length");
-        return {
-          stream: mediaRes.body,
-          contentType,
-          contentLength: contentLength ? parseInt(contentLength, 10) : void 0
-        };
-      }
-      async sendMediaMessage(userId, to, mediaType, mediaId, options, meta) {
-        validatePhoneNumber(to);
-        const { phoneNumberId } = await this.getCredentials(userId);
-        const mediaPayload = { id: mediaId };
-        if (options?.caption && ["image", "video", "document"].includes(mediaType)) {
-          mediaPayload.caption = options.caption;
-        }
-        if (options?.filename && mediaType === "document") {
-          mediaPayload.filename = options.filename;
-        }
-        const payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: to.replace(/[^0-9]/g, ""),
-          type: mediaType,
-          [mediaType]: mediaPayload
-        };
-        try {
-          const response = await this.makeRequest(userId, "POST", `/${phoneNumberId}/messages`, payload);
-          const messageId = response?.messages?.[0]?.id || "";
-          const messageStatus = response?.messages?.[0]?.message_status || "accepted";
-          const preview = options?.caption || options?.filename || `[${mediaType}]`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: `media:${mediaType}`,
-            status: "sent",
-            responseData: response,
-            messageContent: preview.substring(0, 200),
-            messageType: mediaType,
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          console.log(`[Meta WhatsApp] ${mediaType} sent to ${to} (${messageId})`);
-          return { messageId, status: messageStatus };
-        } catch (error) {
-          const preview = options?.caption || options?.filename || `[${mediaType}]`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: `media:${mediaType}`,
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: preview.substring(0, 200),
-            messageType: mediaType,
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          throw error;
-        }
-      }
-      async sendLocationMessage(userId, to, latitude, longitude, name, address, meta) {
-        validatePhoneNumber(to);
-        const { phoneNumberId } = await this.getCredentials(userId);
-        const locationPayload = { latitude, longitude };
-        if (name) locationPayload.name = name;
-        if (address) locationPayload.address = address;
-        const payload = {
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: to.replace(/[^0-9]/g, ""),
-          type: "location",
-          location: locationPayload
-        };
-        try {
-          const response = await this.makeRequest(userId, "POST", `/${phoneNumberId}/messages`, payload);
-          const messageId = response?.messages?.[0]?.id || "";
-          const messageStatus = response?.messages?.[0]?.message_status || "accepted";
-          const preview = name || `${latitude}, ${longitude}`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: "location",
-            status: "sent",
-            responseData: response,
-            messageContent: preview.substring(0, 200),
-            messageType: "location",
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          console.log(`[Meta WhatsApp] Location sent to ${to} (${messageId})`);
-          return { messageId, status: messageStatus };
-        } catch (error) {
-          const preview = name || `${latitude}, ${longitude}`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: "location",
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: preview.substring(0, 200),
-            messageType: "location",
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          throw error;
-        }
-      }
-    };
-    metaWhatsAppService = new MetaWhatsAppService();
-  }
-});
-
-// plugins/messaging/services/whatsway.service.ts
-var whatsway_service_exports = {};
-__export(whatsway_service_exports, {
-  WhatswayService: () => WhatswayService,
-  whatswayService: () => whatswayService
-});
-import { sql as sql15 } from "drizzle-orm";
-function snakeToCamel3(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-function transformRow3(row) {
-  const transformed = {};
-  for (const key of Object.keys(row)) {
-    transformed[snakeToCamel3(key)] = row[key];
-  }
-  return transformed;
-}
-var WhatswayService, whatswayService;
-var init_whatsway_service = __esm({
-  "plugins/messaging/services/whatsway.service.ts"() {
-    "use strict";
-    init_db();
-    init_messaging_log_service();
-    WhatswayService = class {
-      async getSettings(userId) {
-        const result = await db.execute(sql15`
-      SELECT * FROM whatsway_settings WHERE user_id = ${userId} LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow3(row) : null;
-      }
-      async saveSettings(userId, data) {
-        const baseUrl = data.baseUrl || "https://whatsway.diploy.in";
-        const channelId = data.channelId || "";
-        const result = await db.execute(sql15`
-      INSERT INTO whatsway_settings (user_id, api_key, api_secret, base_url, channel_id)
-      VALUES (${userId}, ${data.apiKey}, ${data.apiSecret}, ${baseUrl}, ${channelId})
-      ON CONFLICT (user_id) DO UPDATE SET
-        api_key = EXCLUDED.api_key,
-        api_secret = EXCLUDED.api_secret,
-        base_url = EXCLUDED.base_url,
-        channel_id = EXCLUDED.channel_id,
-        updated_at = NOW()
-      RETURNING *
-    `);
-        return transformRow3(result.rows[0]);
-      }
-      async deactivate(userId) {
-        await db.execute(sql15`
-      UPDATE whatsway_settings SET is_active = false, updated_at = NOW() WHERE user_id = ${userId}
-    `);
-      }
-      async deleteSettings(userId) {
-        await db.execute(sql15`
-      DELETE FROM whatsway_settings WHERE user_id = ${userId}
-    `);
-      }
-      async getCredentials(userId, skipActiveCheck = false) {
-        const settings = await this.getSettings(userId);
-        if (!settings) {
-          throw new Error("WhatsWay not configured. Please add your API credentials first.");
-        }
-        if (!skipActiveCheck && !settings.isActive) {
-          throw new Error("WhatsWay integration is disabled.");
-        }
-        return {
-          apiKey: settings.apiKey,
-          apiSecret: settings.apiSecret,
-          baseUrl: settings.baseUrl,
-          channelId: settings.channelId || ""
-        };
-      }
-      async makeRequest(userId, method, path23, body, skipActiveCheck = false) {
-        const { apiKey, apiSecret, baseUrl, channelId } = await this.getCredentials(userId, skipActiveCheck);
-        const url = `${baseUrl}${path23}`;
-        const headers = {
-          "X-API-Key": apiKey,
-          "X-API-Secret": apiSecret,
-          "Content-Type": "application/json"
-        };
-        if (channelId) {
-          headers["X-Channel-Id"] = channelId;
-        }
-        const options = { method, headers };
-        if (body) {
-          options.body = JSON.stringify(body);
-        }
-        console.log(`[WhatsWay] ${method} ${url}`);
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "Unknown error");
-          let errorMessage = `WhatsWay API error (${response.status})`;
-          if (response.status === 401 || response.status === 403) {
-            errorMessage = "Invalid WhatsWay API credentials";
-          } else if (response.status === 429) {
-            errorMessage = "WhatsWay rate limit exceeded. Please try again later.";
-          } else {
-            try {
-              const errorJson = JSON.parse(errorText);
-              errorMessage = errorJson.error || errorMessage;
-            } catch {
-              errorMessage = `${errorMessage}: ${errorText}`;
-            }
-          }
-          throw new Error(errorMessage);
-        }
-        return response.json();
-      }
-      async testConnection(userId, skipActiveCheck = false) {
-        const response = await this.makeRequest(userId, "GET", "/api/v1/account", void 0, skipActiveCheck);
-        if (!response.success) {
-          throw new Error(response.error || "Failed to connect to WhatsWay");
-        }
-        return response.data;
-      }
-      async getTemplates(userId) {
-        const response = await this.makeRequest(userId, "GET", "/api/v1/templates?status=APPROVED");
-        if (!response.success) {
-          throw new Error(response.error || "Failed to fetch templates");
-        }
-        return Array.isArray(response.data) ? response.data : [];
-      }
-      async sendTemplate(userId, to, templateName, language, components = [], meta) {
-        try {
-          const response = await this.makeRequest(userId, "POST", "/api/v1/messages/template", {
-            to,
-            templateName,
-            language,
-            components
-          });
-          if (!response.success) {
-            throw new Error(response.error || "Failed to send WhatsApp template message");
-          }
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName,
-            status: "sent",
-            responseData: response.data
-          });
-          console.log(`\u2705 [WhatsWay] Template "${templateName}" sent to ${to}`);
-          return response.data;
-        } catch (error) {
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName,
-            status: "failed",
-            errorMessage: error.message
-          });
-          console.log(`\u274C [WhatsWay] Failed to send template "${templateName}" to ${to}: ${error.message}`);
-          throw error;
-        }
-      }
-      async sendReply(userId, to, message, meta) {
-        try {
-          const response = await this.makeRequest(userId, "POST", "/api/v1/messages/reply", {
-            to,
-            message
-          });
-          if (!response.success) {
-            throw new Error(response.error || "Failed to send WhatsApp reply");
-          }
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName: "reply",
-            status: "sent",
-            responseData: response.data
-          });
-          console.log(`\u2705 [WhatsWay] Reply sent to ${to}`);
-          return response.data;
-        } catch (error) {
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientPhone: to,
-            templateName: "reply",
-            status: "failed",
-            errorMessage: error.message
-          });
-          throw error;
-        }
-      }
-      async uploadMedia(userId, fileBuffer, mimeType, filename) {
-        const { apiKey, apiSecret, baseUrl, channelId } = await this.getCredentials(userId);
-        const url = `${baseUrl}/api/v1/media/upload`;
-        const formData = new FormData();
-        formData.append("file", new Blob([fileBuffer], { type: mimeType }), filename);
-        formData.append("mimeType", mimeType);
-        const headers = {
-          "X-API-Key": apiKey,
-          "X-API-Secret": apiSecret
-        };
-        if (channelId) headers["X-Channel-Id"] = channelId;
-        console.log(`[WhatsWay] Uploading media: ${filename} (${mimeType}, ${fileBuffer.length} bytes)`);
-        const response = await fetch(url, {
-          method: "POST",
-          headers,
-          body: formData
-        });
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => "Unknown error");
-          throw new Error(`WhatsWay media upload failed (${response.status}): ${errorText}`);
-        }
-        const json = await response.json();
-        const mediaId = json?.data?.mediaId || json?.data?.id || json?.data?.url || "";
-        if (!mediaId) {
-          throw new Error("WhatsWay media upload succeeded but no media ID returned");
-        }
-        console.log(`[WhatsWay] Media uploaded: ${mediaId}`);
-        return mediaId;
-      }
-      async getMediaStream(userId, mediaId) {
-        const { apiKey, apiSecret, baseUrl, channelId } = await this.getCredentials(userId);
-        let downloadUrl;
-        if (mediaId.startsWith("http://") || mediaId.startsWith("https://")) {
-          const allowedHost = new URL(baseUrl).host;
-          const mediaHost = new URL(mediaId).host;
-          if (mediaHost !== allowedHost) {
-            throw new Error("Media URL is not from a trusted WhatsWay host");
-          }
-          downloadUrl = mediaId;
-        } else {
-          downloadUrl = `${baseUrl}/api/v1/media/${encodeURIComponent(mediaId)}`;
-        }
-        const headers = {
-          "X-API-Key": apiKey,
-          "X-API-Secret": apiSecret
-        };
-        if (channelId) headers["X-Channel-Id"] = channelId;
-        const mediaRes = await fetch(downloadUrl, { headers });
-        if (!mediaRes.ok) {
-          throw new Error(`WhatsWay media download failed (${mediaRes.status})`);
-        }
-        const contentType = mediaRes.headers.get("content-type") || "application/octet-stream";
-        const contentLength = mediaRes.headers.get("content-length");
-        return {
-          stream: mediaRes.body,
-          contentType,
-          contentLength: contentLength ? parseInt(contentLength, 10) : void 0
-        };
-      }
-      async sendMediaMessage(userId, to, mediaType, mediaId, options, meta) {
-        try {
-          const response = await this.makeRequest(userId, "POST", "/api/v1/messages/media", {
-            to,
-            type: mediaType,
-            mediaId,
-            caption: options?.caption,
-            filename: options?.filename
-          });
-          if (!response.success) {
-            throw new Error(response.error || "Failed to send WhatsApp media message");
-          }
-          const preview = options?.caption || options?.filename || `[${mediaType}]`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: `media:${mediaType}`,
-            status: "sent",
-            responseData: response.data,
-            messageContent: preview.substring(0, 200),
-            messageType: mediaType,
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          console.log(`\u2705 [WhatsWay] ${mediaType} sent to ${to}`);
-          return response.data;
-        } catch (error) {
-          const preview = options?.caption || options?.filename || `[${mediaType}]`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: `media:${mediaType}`,
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: preview.substring(0, 200),
-            messageType: mediaType,
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          throw error;
-        }
-      }
-      async sendLocationMessage(userId, to, latitude, longitude, name, address, meta) {
-        try {
-          const response = await this.makeRequest(userId, "POST", "/api/v1/messages/location", {
-            to,
-            latitude,
-            longitude,
-            name,
-            address
-          });
-          if (!response.success) {
-            throw new Error(response.error || "Failed to send WhatsApp location message");
-          }
-          const preview = name || `${latitude}, ${longitude}`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: "location",
-            status: "sent",
-            responseData: response.data,
-            messageContent: preview.substring(0, 200),
-            messageType: "location",
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          console.log(`\u2705 [WhatsWay] Location sent to ${to}`);
-          return response.data;
-        } catch (error) {
-          const preview = name || `${latitude}, ${longitude}`;
-          await messagingLogService.logMessage(userId, "whatsapp", {
-            recipientPhone: to,
-            templateName: "location",
-            status: "failed",
-            errorMessage: error.message,
-            messageContent: preview.substring(0, 200),
-            messageType: "location",
-            callId: meta?.callId,
-            agentId: meta?.agentId
-          });
-          throw error;
-        }
-      }
-    };
-    whatswayService = new WhatswayService();
-  }
-});
-
-// plugins/messaging/services/email-sender.service.ts
-import { sql as sql16 } from "drizzle-orm";
-import nodemailer2 from "nodemailer";
-function cleanDbValue(value) {
-  if (!value) return "";
-  let cleaned = value.trim();
-  while (cleaned.startsWith('"""') && cleaned.endsWith('"""') || cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.length > 2) {
-    if (cleaned.startsWith('"""') && cleaned.endsWith('"""')) {
-      cleaned = cleaned.slice(3, -3);
-    } else if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-      cleaned = cleaned.slice(1, -1);
-    }
-    cleaned = cleaned.trim();
-  }
-  return cleaned;
-}
-function createTransporter(host, portNum, user, pass) {
-  return nodemailer2.createTransport({
-    host,
-    port: portNum,
-    secure: portNum === 465,
-    requireTLS: portNum === 587,
-    pool: true,
-    maxConnections: 5,
-    auth: { user, pass },
-    tls: { rejectUnauthorized: false },
-    connectionTimeout: 15e3,
-    greetingTimeout: 15e3,
-    socketTimeout: 15e3
-  });
-}
-async function initializeFromDatabase() {
-  try {
-    const settings = await db.execute(sql16`
-      SELECT key, value FROM global_settings WHERE key IN ('smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name')
-    `);
-    let rows = [];
-    if (Array.isArray(settings)) {
-      rows = settings;
-    } else if (Array.isArray(settings.rows)) {
-      rows = settings.rows;
-    }
-    const map = {};
-    for (const row of rows) {
-      map[row.key] = typeof row.value === "string" ? row.value : String(row.value ?? "");
-    }
-    const host = cleanDbValue(map["smtp_host"]);
-    const port = map["smtp_port"];
-    const user = cleanDbValue(map["smtp_username"]);
-    const pass = cleanDbValue(map["smtp_password"]);
-    const fromEmail = cleanDbValue(map["smtp_from_email"]);
-    const fName = cleanDbValue(map["smtp_from_name"]);
-    if (host && port && user && pass) {
-      const portNum = typeof port === "string" ? parseInt(port, 10) : Number(port);
-      transporter = createTransporter(host, portNum, user, pass);
-      smtpConfigured = true;
-      fromAddress = fromEmail || user || "";
-      fromName = fName || "";
-      return true;
-    }
-    console.warn("[Email Sender] SMTP settings incomplete in admin panel (missing host, port, username, or password).");
-  } catch (error) {
-    console.warn("[Email Sender] Could not load SMTP settings from database:", error.message);
-  }
-  smtpConfigured = false;
-  transporter = null;
-  return false;
-}
-async function sendEmail(to, subject, html) {
-  const dbLoaded = await initializeFromDatabase();
-  if (!dbLoaded || !smtpConfigured || !transporter) {
-    const reason = "SMTP not configured. Please set up SMTP in Admin Settings \u2192 Master Settings.";
-    console.warn(`[Email Sender] Cannot send to ${to}: ${reason}`);
-    return { success: false, error: reason };
-  }
-  const from = fromName ? `"${fromName}" <${fromAddress}>` : fromAddress;
-  if (!from) {
-    return { success: false, error: "No from address configured in Admin Settings \u2192 Master Settings." };
-  }
-  try {
-    const info = await transporter.sendMail({ from, to, subject, html });
-    return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error(`[Email Sender] Failed to send email to ${to}:`, error.message);
-    return { success: false, error: error.message };
-  }
-}
-var transporter, fromAddress, fromName, smtpConfigured;
-var init_email_sender_service = __esm({
-  "plugins/messaging/services/email-sender.service.ts"() {
-    "use strict";
-    init_db();
-    transporter = null;
-    fromAddress = "";
-    fromName = "";
-    smtpConfigured = false;
-  }
-});
-
-// plugins/messaging/services/email-template.service.ts
-var email_template_service_exports = {};
-__export(email_template_service_exports, {
-  EmailTemplateService: () => EmailTemplateService,
-  emailTemplateService: () => emailTemplateService
-});
-import { sql as sql17 } from "drizzle-orm";
-function snakeToCamel4(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-function transformRow4(row) {
-  const transformed = {};
-  for (const key of Object.keys(row)) {
-    transformed[snakeToCamel4(key)] = row[key];
-  }
-  return transformed;
-}
-var EmailTemplateService, emailTemplateService;
-var init_email_template_service = __esm({
-  "plugins/messaging/services/email-template.service.ts"() {
-    "use strict";
-    init_db();
-    init_email_sender_service();
-    init_messaging_log_service();
-    EmailTemplateService = class {
-      async getAll(userId) {
-        const result = await db.execute(sql17`
-      SELECT * FROM user_email_templates WHERE user_id = ${userId} ORDER BY created_at DESC
-    `);
-        return result.rows.map((row) => transformRow4(row));
-      }
-      async getById(userId, id) {
-        const result = await db.execute(sql17`
-      SELECT * FROM user_email_templates WHERE id = ${id} AND user_id = ${userId} LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow4(row) : null;
-      }
-      async getByName(userId, name) {
-        const result = await db.execute(sql17`
-      SELECT * FROM user_email_templates WHERE name = ${name} AND user_id = ${userId} AND is_active = true LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow4(row) : null;
-      }
-      async create(userId, data) {
-        const variables = data.variables || [];
-        const pgArray = `{${variables.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(",")}}`;
-        const result = await db.execute(sql17`
-      INSERT INTO user_email_templates (user_id, name, subject, html_body, variables)
-      VALUES (${userId}, ${data.name}, ${data.subject}, ${data.htmlBody}, ${pgArray}::text[])
-      RETURNING *
-    `);
-        return transformRow4(result.rows[0]);
-      }
-      async update(userId, id, data) {
-        const existing = await this.getById(userId, id);
-        if (!existing) return null;
-        const name = data.name ?? existing.name;
-        const subject = data.subject ?? existing.subject;
-        const htmlBody = data.htmlBody ?? existing.htmlBody;
-        const isActive = data.isActive ?? existing.isActive;
-        const variables = data.variables ?? existing.variables ?? [];
-        const pgArray = `{${variables.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(",")}}`;
-        const result = await db.execute(sql17`
-      UPDATE user_email_templates
-      SET name = ${name}, subject = ${subject}, html_body = ${htmlBody}, is_active = ${isActive},
-          variables = ${pgArray}::text[],
-          updated_at = NOW()
-      WHERE id = ${id} AND user_id = ${userId}
-      RETURNING *
-    `);
-        const row = result.rows[0];
-        return row ? transformRow4(row) : null;
-      }
-      async delete(userId, id) {
-        const result = await db.execute(sql17`
-      DELETE FROM user_email_templates WHERE id = ${id} AND user_id = ${userId}
-    `);
-        return result.rowCount > 0;
-      }
-      wrapAgentEmailTemplate(content) {
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>{{company_name}}</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      color: #1f2937;
-      background-color: #f3f4f6;
-      margin: 0;
-      padding: 0;
-    }
-    .email-wrapper {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 40px 20px;
-    }
-    .email-container {
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-    }
-    .email-header {
-      background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-      padding: 32px;
-      text-align: center;
-    }
-    .email-logo {
-      font-size: 28px;
-      font-weight: 700;
-      color: #ffffff;
-      margin: 0;
-      letter-spacing: -0.5px;
-    }
-    .email-tagline {
-      color: #94a3b8;
-      font-size: 14px;
-      margin: 8px 0 0 0;
-    }
-    .email-body {
-      padding: 40px 32px;
-    }
-    .email-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: #1f2937;
-      margin: 0 0 16px 0;
-    }
-    .email-text {
-      font-size: 16px;
-      color: #4b5563;
-      margin: 0 0 24px 0;
-    }
-    .email-highlight-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 24px;
-      margin: 24px 0;
-    }
-    .email-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0;
-    }
-    .email-table td {
-      padding: 12px 0;
-      border-bottom: 1px solid #e5e7eb;
-      font-size: 15px;
-    }
-    .email-table td:first-child {
-      color: #6b7280;
-    }
-    .email-table td:last-child {
-      text-align: right;
-      font-weight: 500;
-      color: #1f2937;
-    }
-    .email-table tr:last-child td {
-      border-bottom: none;
-      font-weight: 600;
-    }
-    .email-alert {
-      background: #fef3c7;
-      border-left: 4px solid #f59e0b;
-      padding: 16px;
-      margin: 24px 0;
-      border-radius: 0 8px 8px 0;
-    }
-    .email-alert-success {
-      background: #dcfce7;
-      border-left-color: #22c55e;
-    }
-    .email-alert-info {
-      background: #dbeafe;
-      border-left-color: #3b82f6;
-    }
-    .email-footer {
-      background: #f8fafc;
-      padding: 24px 32px;
-      text-align: center;
-      border-top: 1px solid #e5e7eb;
-    }
-    .email-footer-text {
-      font-size: 13px;
-      color: #9ca3af;
-      margin: 0 0 12px 0;
-    }
-    @media only screen and (max-width: 600px) {
-      .email-wrapper {
-        padding: 20px 12px;
-      }
-      .email-body {
-        padding: 28px 20px;
-      }
-      .email-header {
-        padding: 24px 20px;
-      }
-      .email-title {
-        font-size: 20px;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="email-wrapper">
-    <div class="email-container">
-      <div class="email-header">
-        <h1 class="email-logo">{{company_name}}</h1>
-      </div>
-      ${content}
-      <div class="email-footer">
-        <p class="email-footer-text">
-          &copy; {{company_name}}. All rights reserved.
-        </p>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
-      }
-      async seedDefaultTemplates(userId) {
-        const existing = await this.getAll(userId);
-        const existingNames = new Set(existing.map((t) => t.name));
-        const defaults = [
-          {
-            name: "Appointment Confirmation",
-            subject: "Your Appointment is Confirmed - {{company_name}}",
-            bodyContent: `
-      <div class="email-body">
-        <h2 class="email-title">Appointment Confirmed</h2>
-        <p class="email-text">Hi {{contact_name}},</p>
-        <p class="email-text">Your appointment has been successfully booked. Here are the details:</p>
-        <div class="email-highlight-box">
-          <table class="email-table">
-            <tr><td>Date</td><td>{{appointment_date}}</td></tr>
-            <tr><td>Time</td><td>{{appointment_time}}</td></tr>
-            <tr><td>Service</td><td>{{service_name}}</td></tr>
-            <tr><td>Duration</td><td>{{duration}} minutes</td></tr>
-          </table>
-        </div>
-        <div class="email-alert email-alert-success">
-          <strong>You're all set!</strong> We look forward to seeing you.
-        </div>
-        <p class="email-text">{{notes}}</p>
-        <p class="email-text" style="font-size: 14px; color: #6b7280;">
-          If you need to reschedule or cancel, please contact us.
-        </p>
-      </div>`,
-            variables: ["contact_name", "company_name", "appointment_date", "appointment_time", "service_name", "duration", "notes"]
-          },
-          {
-            name: "Appointment Reminder",
-            subject: "Reminder: Your Appointment is Coming Up - {{company_name}}",
-            bodyContent: `
-      <div class="email-body">
-        <h2 class="email-title">Appointment Reminder</h2>
-        <p class="email-text">Hi {{contact_name}},</p>
-        <p class="email-text">This is a friendly reminder about your upcoming appointment:</p>
-        <div class="email-highlight-box">
-          <table class="email-table">
-            <tr><td>Date</td><td>{{appointment_date}}</td></tr>
-            <tr><td>Time</td><td>{{appointment_time}}</td></tr>
-            <tr><td>Service</td><td>{{service_name}}</td></tr>
-            <tr><td>Duration</td><td>{{duration}} minutes</td></tr>
-          </table>
-        </div>
-        <div class="email-alert email-alert-info">
-          <strong>Please arrive on time.</strong> If you need to reschedule, contact us as soon as possible.
-        </div>
-        <p class="email-text">{{notes}}</p>
-      </div>`,
-            variables: ["contact_name", "company_name", "appointment_date", "appointment_time", "service_name", "duration", "notes"]
-          },
-          {
-            name: "Call Follow-Up",
-            subject: "Thank You for Your Call - {{company_name}}",
-            bodyContent: `
-      <div class="email-body">
-        <h2 class="email-title">Thank You for Your Call</h2>
-        <p class="email-text">Hi {{contact_name}},</p>
-        <p class="email-text">Thank you for speaking with us today. We appreciate your time and wanted to follow up with a summary of our conversation.</p>
-        <div class="email-highlight-box">
-          <p style="margin: 0 0 12px 0; font-weight: 600; color: #1e293b;">Call Summary</p>
-          <p style="margin: 0; color: #4b5563;">{{call_summary}}</p>
-        </div>
-        <p class="email-text">{{next_steps}}</p>
-        <p class="email-text" style="font-size: 14px; color: #6b7280;">
-          If you have any questions or need further assistance, please don't hesitate to reach out.
-        </p>
-      </div>`,
-            variables: ["contact_name", "company_name", "call_summary", "next_steps"]
-          },
-          {
-            name: "Missed Call",
-            subject: "We Missed Your Call - {{company_name}}",
-            bodyContent: `
-      <div class="email-body">
-        <h2 class="email-title">We Missed Your Call</h2>
-        <p class="email-text">Hi {{contact_name}},</p>
-        <p class="email-text">We noticed we weren't able to connect with you during our recent call attempt. We'd love to speak with you at a time that works better.</p>
-        <div class="email-alert">
-          <strong>We tried reaching you</strong> but were unable to connect. Please feel free to call us back or let us know a convenient time.
-        </div>
-        <p class="email-text">{{message}}</p>
-        <p class="email-text" style="font-size: 14px; color: #6b7280;">
-          We look forward to connecting with you soon.
-        </p>
-      </div>`,
-            variables: ["contact_name", "company_name", "message"]
-          },
-          {
-            name: "Welcome / Inquiry Response",
-            subject: "Thank You for Your Inquiry - {{company_name}}",
-            bodyContent: `
-      <div class="email-body">
-        <h2 class="email-title">Thank You for Your Inquiry</h2>
-        <p class="email-text">Hi {{contact_name}},</p>
-        <p class="email-text">Thank you for reaching out to us. We've received your inquiry and wanted to provide you with some helpful information.</p>
-        <div class="email-highlight-box">
-          <p style="margin: 0; color: #4b5563;">{{response_details}}</p>
-        </div>
-        <div class="email-alert email-alert-success">
-          <strong>We're here to help!</strong> A member of our team will follow up with you shortly if needed.
-        </div>
-        <p class="email-text">{{additional_info}}</p>
-        <p class="email-text" style="font-size: 14px; color: #6b7280;">
-          If you have any further questions, don't hesitate to contact us.
-        </p>
-      </div>`,
-            variables: ["contact_name", "company_name", "response_details", "additional_info"]
-          }
-        ];
-        const toSeed = defaults.filter((d) => !existingNames.has(d.name));
-        if (toSeed.length === 0) return;
-        console.log(`[Messaging] Seeding ${toSeed.length} default email templates for user ${userId}`);
-        for (const tmpl of toSeed) {
-          try {
-            await this.create(userId, {
-              name: tmpl.name,
-              subject: tmpl.subject,
-              htmlBody: this.wrapAgentEmailTemplate(tmpl.bodyContent),
-              variables: tmpl.variables
-            });
-          } catch (err) {
-            console.warn(`[Messaging] Failed to seed template "${tmpl.name}":`, err.message);
-          }
-        }
-        console.log(`[Messaging] Default email templates seeded for user ${userId}`);
-      }
-      substituteVariables(template, variables) {
-        let result = template;
-        for (const [key, value] of Object.entries(variables)) {
-          const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g");
-          result = result.replace(regex, value || "");
-        }
-        return result;
-      }
-      async sendEmail(userId, templateId, recipientEmail, variables = {}, meta) {
-        const template = await this.getById(userId, templateId);
-        if (!template) {
-          const error = `Email template not found: ${templateId}`;
-          await messagingLogService.logMessage(userId, "email", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientEmail,
-            templateName: templateId,
-            status: "failed",
-            errorMessage: error
-          });
-          return { success: false, error };
-        }
-        const subject = this.substituteVariables(template.subject, variables);
-        const htmlBody = this.substituteVariables(template.htmlBody, variables);
-        try {
-          const result = await sendEmail(recipientEmail, subject, htmlBody);
-          await messagingLogService.logMessage(userId, "email", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientEmail,
-            templateName: template.name,
-            status: result.success ? "sent" : "failed",
-            responseData: result.success ? { messageId: result.messageId } : void 0,
-            errorMessage: result.error
-          });
-          if (result.success) {
-            console.log(`\u2705 [Messaging] Email "${template.name}" sent to ${recipientEmail}`);
-          } else {
-            console.log(`\u274C [Messaging] Email "${template.name}" failed to ${recipientEmail}: ${result.error}`);
-          }
-          return result;
-        } catch (error) {
-          const errorMsg = error.message || "Unknown email error";
-          await messagingLogService.logMessage(userId, "email", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientEmail,
-            templateName: template.name,
-            status: "failed",
-            errorMessage: errorMsg
-          });
-          console.log(`\u274C [Messaging] Email "${template.name}" error to ${recipientEmail}: ${errorMsg}`);
-          return { success: false, error: errorMsg };
-        }
-      }
-      async sendEmailByName(userId, templateName, recipientEmail, variables = {}, meta) {
-        const template = await this.getByName(userId, templateName);
-        if (!template) {
-          const error = `Email template "${templateName}" not found`;
-          await messagingLogService.logMessage(userId, "email", {
-            callId: meta?.callId,
-            agentId: meta?.agentId,
-            recipientEmail,
-            templateName,
-            status: "failed",
-            errorMessage: error
-          });
-          return { success: false, error };
-        }
-        return this.sendEmail(userId, template.id, recipientEmail, variables, meta);
-      }
-    };
-    emailTemplateService = new EmailTemplateService();
-  }
-});
-
 // server/services/post-call-messaging.ts
 var post_call_messaging_exports = {};
 __export(post_call_messaging_exports, {
   triggerPostCallMessaging: () => triggerPostCallMessaging
 });
-import { sql as sql18, eq as eq19, and as and15, desc as desc7 } from "drizzle-orm";
+import { sql as sql13, eq as eq19, and as and15, desc as desc7 } from "drizzle-orm";
 function extractRows(result) {
   if (Array.isArray(result)) return result;
   if (Array.isArray(result.rows)) return result.rows;
@@ -19895,7 +18330,7 @@ async function readCallerEmailFromMetadata(callId) {
     for (const table of CALL_TABLES) {
       try {
         const result = await db.execute(
-          sql18`SELECT metadata->>'callerEmail' as caller_email FROM ${sql18.identifier(table)} WHERE id = ${callId} LIMIT 1`
+          sql13`SELECT metadata->>'callerEmail' as caller_email FROM ${sql13.identifier(table)} WHERE id = ${callId} LIMIT 1`
         );
         const rows = extractRows(result);
         if (rows.length > 0 && rows[0].caller_email) {
@@ -19921,7 +18356,7 @@ async function lookupContactByPhone(phone, userId) {
       phone: contacts.phone
     }).from(contacts).innerJoin(campaigns, eq19(contacts.campaignId, campaigns.id)).where(and15(
       eq19(campaigns.userId, userId),
-      sql18`${contacts.phone} LIKE ${"%" + digits.slice(-10)}`
+      sql13`${contacts.phone} LIKE ${"%" + digits.slice(-10)}`
     )).orderBy(desc7(contacts.createdAt)).limit(1);
     if (results.length > 0) {
       const c = results[0];
@@ -19940,7 +18375,7 @@ async function lookupContactByPhone(phone, userId) {
 async function lookupSipCallData(callId, userId) {
   if (!callId || !userId) return { conversationId: "", contactData: {} };
   try {
-    const result = await db.execute(sql18`
+    const result = await db.execute(sql13`
       SELECT sc.elevenlabs_conversation_id, sc.from_number, sc.to_number, sc.direction,
              a.name as agent_name,
              COALESCE(ct.first_name || ' ' || ct.last_name, ct.first_name, '') as contact_name,
@@ -19973,7 +18408,7 @@ async function lookupSipCallData(callId, userId) {
 async function lookupRegularCallData(callId, userId) {
   if (!callId || !userId) return {};
   try {
-    const result = await db.execute(sql18`
+    const result = await db.execute(sql13`
       SELECT c.phone_number, c.from_number, c.to_number, c.call_direction,
              a.name as agent_name,
              COALESCE(ct.first_name || ' ' || ct.last_name, ct.first_name, '') as contact_name,
@@ -20005,9 +18440,9 @@ async function lookupAppointmentData(callId, conversationId, userId) {
   try {
     const ids = [callId, conversationId].filter(Boolean);
     if (ids.length === 0 || !userId) return {};
-    const conditions = ids.map((id) => sql18`call_id = ${id}`);
-    const orClause = conditions.length === 1 ? conditions[0] : sql18`(${sql18.join(conditions, sql18` OR `)})`;
-    const result = await db.execute(sql18`
+    const conditions = ids.map((id) => sql13`call_id = ${id}`);
+    const orClause = conditions.length === 1 ? conditions[0] : sql13`(${sql13.join(conditions, sql13` OR `)})`;
+    const result = await db.execute(sql13`
       SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
              duration, service_name, notes, status
       FROM appointments
@@ -20066,7 +18501,7 @@ async function triggerPostCallMessaging(params) {
   _triggeredCallIds.add(dedupeKey);
   setTimeout(() => _triggeredCallIds.delete(dedupeKey), 10 * 60 * 1e3);
   try {
-    const agentRows = await db.select().from(agents).where(sql18`eleven_labs_agent_id = ${elevenLabsAgentId} OR id = ${elevenLabsAgentId}`).limit(1);
+    const agentRows = await db.select().from(agents).where(sql13`eleven_labs_agent_id = ${elevenLabsAgentId} OR id = ${elevenLabsAgentId}`).limit(1);
     if (agentRows.length === 0) {
       console.log(`[Post-Call Messaging] Agent not found: ${elevenLabsAgentId}`);
       return;
@@ -20135,11 +18570,11 @@ async function triggerPostCallMessaging(params) {
           console.warn(`[Post-Call Messaging] Cannot send WhatsApp: invalid caller phone "${callerPhone}"`);
         } else {
           console.log(`[Post-Call Messaging] Initializing WhatsApp services for user ${userId2}...`);
-          const { metaWhatsAppService: metaWhatsAppService2, MetaWhatsAppService: MetaWhatsAppService2 } = await Promise.resolve().then(() => (init_meta_whatsapp_service(), meta_whatsapp_service_exports));
-          const { whatswayService: whatswayService2 } = await Promise.resolve().then(() => (init_whatsway_service(), whatsway_service_exports));
+          const { metaWhatsAppService, MetaWhatsAppService } = await import("../../plugins/messaging/services/meta-whatsapp.service");
+          const { whatswayService } = await import("../../plugins/messaging/services/whatsway.service");
           console.log(`[Post-Call Messaging] Services imported successfully.`);
-          const metaSettings = await metaWhatsAppService2.getSettings(userId2);
-          const whatswaySettings = await whatswayService2.getSettings(userId2);
+          const metaSettings = await metaWhatsAppService.getSettings(userId2);
+          const whatswaySettings = await whatswayService.getSettings(userId2);
           console.log(`[Post-Call Messaging] Settings fetched. Meta Active: ${!!metaSettings?.isActive}, WhatsWay Active: ${!!whatswaySettings?.isActive}`);
           let components = [];
           const buttonOverrides = {};
@@ -20179,7 +18614,7 @@ async function triggerPostCallMessaging(params) {
           let templateLanguage = "en_US";
           if (metaSettings?.isActive) {
             try {
-              const templateDef = await metaWhatsAppService2.getTemplateByName(userId2, whatsappTemplate);
+              const templateDef = await metaWhatsAppService.getTemplateByName(userId2, whatsappTemplate);
               templateLanguage = templateDef?.language || "en_US";
               if (templateDef?.components) {
                 const bodyComp = templateDef.components.find((c) => c.type === "BODY");
@@ -20263,7 +18698,7 @@ async function triggerPostCallMessaging(params) {
                     }
                   }
                 }
-                const buttonComponents = MetaWhatsAppService2.buildButtonComponents(
+                const buttonComponents = MetaWhatsAppService.buildButtonComponents(
                   templateDef.components,
                   Object.keys(buttonOverrides).length > 0 ? buttonOverrides : void 0
                 );
@@ -20277,11 +18712,11 @@ async function triggerPostCallMessaging(params) {
             }
             console.log(`[Post-Call Messaging] Attempting Meta send for ${callerPhone}...`);
             console.log(`[Post-Call Messaging] Final Resolved Components for Meta: ${JSON.stringify(components, null, 2)}`);
-            const result = await metaWhatsAppService2.sendTemplate(userId2, callerPhone, whatsappTemplate, templateLanguage, components, { callId, agentId: dbAgentId });
+            const result = await metaWhatsAppService.sendTemplate(userId2, callerPhone, whatsappTemplate, templateLanguage, components, { callId, agentId: dbAgentId });
             console.log(`\u2705 [Post-Call Messaging] WhatsApp sent via Meta. Result: ${JSON.stringify(result)}`);
           } else if (whatswaySettings?.isActive) {
             console.log(`[Post-Call Messaging] Final Resolved Components for WhatsWay: ${JSON.stringify(components, null, 2)}`);
-            const result = await whatswayService2.sendTemplate(userId2, callerPhone, whatsappTemplate, templateLanguage, components, { callId, agentId: dbAgentId });
+            const result = await whatswayService.sendTemplate(userId2, callerPhone, whatsappTemplate, templateLanguage, components, { callId, agentId: dbAgentId });
             console.log(`\u2705 [Post-Call Messaging] WhatsApp sent via WhatsWay. Result: ${JSON.stringify(result)}`);
           } else {
             console.warn(`[Post-Call Messaging] No active WhatsApp provider for user ${userId2}`);
@@ -20297,7 +18732,7 @@ async function triggerPostCallMessaging(params) {
         if (!callerEmail) {
           console.warn(`[Post-Call Messaging] Cannot send email: no email address collected for caller ${callerPhone}`);
         } else {
-          const { emailTemplateService: emailTemplateService2 } = await Promise.resolve().then(() => (init_email_template_service(), email_template_service_exports));
+          const { emailTemplateService } = await import("../../plugins/messaging/services/email-template.service");
           const variables = {
             contact_name: contactData.contact_name || "",
             contact_phone: callerPhone,
@@ -20310,7 +18745,7 @@ async function triggerPostCallMessaging(params) {
             ...contactData.notes ? { notes: contactData.notes } : {},
             ...contactData.appointment_status ? { appointment_status: contactData.appointment_status } : {}
           };
-          await emailTemplateService2.sendEmailByName(userId2, emailTemplate, callerEmail, variables, { callId, agentId: dbAgentId });
+          await emailTemplateService.sendEmailByName(userId2, emailTemplate, callerEmail, variables, { callId, agentId: dbAgentId });
           console.log(`\u2705 [Post-Call Messaging] Email sent to ${callerEmail}`);
         }
       } catch (emailErr) {
@@ -20530,7 +18965,7 @@ var appointment_whatsapp_exports = {};
 __export(appointment_whatsapp_exports, {
   sendAppointmentWhatsAppConfirmation: () => sendAppointmentWhatsAppConfirmation
 });
-import { sql as sql19 } from "drizzle-orm";
+import { sql as sql14 } from "drizzle-orm";
 function formatReadableDate(dateStr) {
   try {
     const d = /* @__PURE__ */ new Date(dateStr + "T12:00:00");
@@ -20557,7 +18992,7 @@ async function sendAppointmentWhatsAppConfirmation(params) {
       console.warn(`[Appointment WhatsApp] Skipping: invalid phone "${callerPhone}"`);
       return;
     }
-    const agentRows = await db.select().from(agents).where(sql19`eleven_labs_agent_id = ${elevenLabsAgentId} OR id = ${elevenLabsAgentId}`).limit(1);
+    const agentRows = await db.select().from(agents).where(sql14`eleven_labs_agent_id = ${elevenLabsAgentId} OR id = ${elevenLabsAgentId}`).limit(1);
     if (agentRows.length === 0) {
       console.log(`[Appointment WhatsApp] Agent not found: ${elevenLabsAgentId}`);
       return;
@@ -20583,37 +19018,37 @@ async function sendAppointmentWhatsAppConfirmation(params) {
       { type: "text", text: doctorName }
     ];
     const components = [{ type: "body", parameters: bodyParameters }];
-    let metaWhatsAppService2;
-    let MetaWhatsAppService2;
-    let whatswayService2;
+    let metaWhatsAppService;
+    let MetaWhatsAppService;
+    let whatswayService;
     try {
-      const metaMod = await Promise.resolve().then(() => (init_meta_whatsapp_service(), meta_whatsapp_service_exports));
-      metaWhatsAppService2 = metaMod.metaWhatsAppService;
-      MetaWhatsAppService2 = metaMod.MetaWhatsAppService;
+      const metaMod = await import("../../plugins/messaging/services/meta-whatsapp.service");
+      metaWhatsAppService = metaMod.metaWhatsAppService;
+      MetaWhatsAppService = metaMod.MetaWhatsAppService;
     } catch {
     }
     try {
-      const wwMod = await Promise.resolve().then(() => (init_whatsway_service(), whatsway_service_exports));
-      whatswayService2 = wwMod.whatswayService;
+      const wwMod = await import("../../plugins/messaging/services/whatsway.service");
+      whatswayService = wwMod.whatswayService;
     } catch {
     }
-    if (!metaWhatsAppService2 && !whatswayService2) {
+    if (!metaWhatsAppService && !whatswayService) {
       console.warn(`[Appointment WhatsApp] No WhatsApp provider available (messaging plugin not installed)`);
       return;
     }
     let templateLanguage = "en_US";
-    const metaSettings = metaWhatsAppService2 ? await metaWhatsAppService2.getSettings(userId) : null;
-    const whatswaySettings = whatswayService2 ? await whatswayService2.getSettings(userId) : null;
+    const metaSettings = metaWhatsAppService ? await metaWhatsAppService.getSettings(userId) : null;
+    const whatswaySettings = whatswayService ? await whatswayService.getSettings(userId) : null;
     if (!metaSettings?.isActive && !whatswaySettings?.isActive) {
       console.warn(`[Appointment WhatsApp] No active WhatsApp provider for user ${userId}`);
       return;
     }
-    if (metaSettings?.isActive && metaWhatsAppService2) {
+    if (metaSettings?.isActive && metaWhatsAppService) {
       try {
-        const templateDef = await metaWhatsAppService2.getTemplateByName(userId, agent.messagingWhatsappTemplate);
+        const templateDef = await metaWhatsAppService.getTemplateByName(userId, agent.messagingWhatsappTemplate);
         templateLanguage = templateDef?.language || "en_US";
         if (templateDef?.components) {
-          const buttonComponents = MetaWhatsAppService2.buildButtonComponents(templateDef.components);
+          const buttonComponents = MetaWhatsAppService.buildButtonComponents(templateDef.components);
           if (buttonComponents.length > 0) {
             components.push(...buttonComponents);
           }
@@ -20621,7 +19056,7 @@ async function sendAppointmentWhatsAppConfirmation(params) {
       } catch (tmplErr) {
         console.warn(`[Appointment WhatsApp] Could not fetch Meta template: ${tmplErr.message}`);
       }
-      const result = await metaWhatsAppService2.sendTemplate(
+      const result = await metaWhatsAppService.sendTemplate(
         userId,
         callerPhone,
         agent.messagingWhatsappTemplate,
@@ -20630,8 +19065,8 @@ async function sendAppointmentWhatsAppConfirmation(params) {
         { callId, agentId: agent.id, appointmentId }
       );
       console.log(`\u2705 [Appointment WhatsApp] Sent via Meta. Result: ${JSON.stringify(result)}`);
-    } else if (whatswaySettings?.isActive && whatswayService2) {
-      const result = await whatswayService2.sendTemplate(
+    } else if (whatswaySettings?.isActive && whatswayService) {
+      const result = await whatswayService.sendTemplate(
         userId,
         callerPhone,
         agent.messagingWhatsappTemplate,
@@ -20656,7 +19091,7 @@ var init_appointment_whatsapp = __esm({
 
 // server/services/rag-knowledge.ts
 import OpenAI2 from "openai";
-import { eq as eq21, and as and16, inArray as inArray5, sql as sql20 } from "drizzle-orm";
+import { eq as eq21, and as and16, inArray as inArray5, sql as sql15 } from "drizzle-orm";
 async function getOpenAIApiKey() {
   try {
     const [dbSetting] = await db.select().from(globalSettings).where(eq21(globalSettings.key, "openai_api_key")).limit(1);
@@ -20762,7 +19197,7 @@ var init_rag_knowledge = __esm({
        */
       static async updateUsedStorage(userId, deltaBytes) {
         await db.update(userKnowledgeStorageLimits).set({
-          usedStorageBytes: sql20`${userKnowledgeStorageLimits.usedStorageBytes} + ${deltaBytes}`,
+          usedStorageBytes: sql15`${userKnowledgeStorageLimits.usedStorageBytes} + ${deltaBytes}`,
           updatedAt: /* @__PURE__ */ new Date()
         }).where(eq21(userKnowledgeStorageLimits.userId, userId));
       }
@@ -20914,7 +19349,7 @@ var init_rag_knowledge = __esm({
        * Get processing status for a knowledge base item
        */
       static async getProcessingStatus(knowledgeBaseId) {
-        const [entry] = await db.select().from(knowledgeProcessingQueue).where(eq21(knowledgeProcessingQueue.knowledgeBaseId, knowledgeBaseId)).orderBy(sql20`${knowledgeProcessingQueue.createdAt} DESC`).limit(1);
+        const [entry] = await db.select().from(knowledgeProcessingQueue).where(eq21(knowledgeProcessingQueue.knowledgeBaseId, knowledgeBaseId)).orderBy(sql15`${knowledgeProcessingQueue.createdAt} DESC`).limit(1);
         if (!entry) {
           return null;
         }
@@ -20929,7 +19364,7 @@ var init_rag_knowledge = __esm({
        * Get chunk count for a knowledge base item
        */
       static async getChunkCount(knowledgeBaseId) {
-        const result = await db.select({ count: sql20`count(*)` }).from(knowledgeChunks).where(eq21(knowledgeChunks.knowledgeBaseId, knowledgeBaseId));
+        const result = await db.select({ count: sql15`count(*)` }).from(knowledgeChunks).where(eq21(knowledgeChunks.knowledgeBaseId, knowledgeBaseId));
         return Number(result[0]?.count || 0);
       }
     };
@@ -21207,7 +19642,7 @@ var init_plivo_config = __esm({
 });
 
 // server/engines/plivo/services/openai-pool.service.ts
-import { eq as eq25, and as and18, desc as desc8, asc as asc4, sql as sql22 } from "drizzle-orm";
+import { eq as eq25, and as and18, desc as desc8, asc as asc4, sql as sql17 } from "drizzle-orm";
 var lastNotificationThreshold2, OpenAIPoolService;
 var init_openai_pool_service = __esm({
   "server/engines/plivo/services/openai-pool.service.ts"() {
@@ -21356,7 +19791,7 @@ var init_openai_pool_service = __esm({
         try {
           let result;
           if (tier) {
-            result = await db.execute(sql22`
+            result = await db.execute(sql17`
           UPDATE openai_credentials
           SET current_load = current_load + 1,
               updated_at = NOW()
@@ -21374,7 +19809,7 @@ var init_openai_pool_service = __esm({
           RETURNING *
         `);
           } else {
-            result = await db.execute(sql22`
+            result = await db.execute(sql17`
           UPDATE openai_credentials
           SET current_load = current_load + 1,
               updated_at = NOW()
@@ -21409,7 +19844,7 @@ var init_openai_pool_service = __esm({
        */
       static async reserveSlotOnCredential(credentialId) {
         try {
-          const result = await db.execute(sql22`
+          const result = await db.execute(sql17`
         UPDATE openai_credentials
         SET current_load = current_load + 1,
             updated_at = NOW()
@@ -21435,7 +19870,7 @@ var init_openai_pool_service = __esm({
        */
       static async releaseSlot(credentialId) {
         await db.update(openaiCredentials).set({
-          currentLoad: sql22`GREATEST(0, ${openaiCredentials.currentLoad} - 1)`,
+          currentLoad: sql17`GREATEST(0, ${openaiCredentials.currentLoad} - 1)`,
           updatedAt: /* @__PURE__ */ new Date()
         }).where(eq25(openaiCredentials.id, credentialId));
         console.log(`\u{1F513} [OpenAI Pool] Released slot on credential ${credentialId}`);
@@ -21446,12 +19881,12 @@ var init_openai_pool_service = __esm({
       static async updateAssignmentCount(credentialId, increment) {
         if (increment) {
           await db.update(openaiCredentials).set({
-            totalAssignedAgents: sql22`${openaiCredentials.totalAssignedAgents} + 1`,
+            totalAssignedAgents: sql17`${openaiCredentials.totalAssignedAgents} + 1`,
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq25(openaiCredentials.id, credentialId));
         } else {
           await db.update(openaiCredentials).set({
-            totalAssignedAgents: sql22`GREATEST(0, ${openaiCredentials.totalAssignedAgents} - 1)`,
+            totalAssignedAgents: sql17`GREATEST(0, ${openaiCredentials.totalAssignedAgents} - 1)`,
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq25(openaiCredentials.id, credentialId));
         }
@@ -21617,7 +20052,7 @@ var init_openai_pool_service = __esm({
         const credentials = await db.select().from(openaiCredentials);
         const updates = [];
         for (const credential of credentials) {
-          const [result] = await db.select({ count: sql22`count(*)::int` }).from(agents).where(eq25(agents.openaiCredentialId, credential.id));
+          const [result] = await db.select({ count: sql17`count(*)::int` }).from(agents).where(eq25(agents.openaiCredentialId, credential.id));
           const actualCount = result?.count || 0;
           const oldCount = credential.totalAssignedAgents;
           if (actualCount !== oldCount) {
@@ -21651,7 +20086,7 @@ var init_openai_pool_service = __esm({
         const credential = await this.getLeastLoadedCredential(requiredTier);
         if (credential) {
           await db.update(openaiCredentials).set({
-            totalAssignedUsers: sql22`${openaiCredentials.totalAssignedUsers} + 1`,
+            totalAssignedUsers: sql17`${openaiCredentials.totalAssignedUsers} + 1`,
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq25(openaiCredentials.id, credential.id));
         }
@@ -21846,7 +20281,7 @@ __export(plivo_call_service_exports, {
   PlivoCallService: () => PlivoCallService
 });
 import * as plivo from "plivo";
-import { eq as eq26, and as and19, desc as desc9, sql as sql23 } from "drizzle-orm";
+import { eq as eq26, and as and19, desc as desc9, sql as sql18 } from "drizzle-orm";
 var PlivoCallService;
 var init_plivo_call_service = __esm({
   "server/engines/plivo/services/plivo-call.service.ts"() {
@@ -22073,14 +20508,21 @@ var init_plivo_call_service = __esm({
           }
           return { callUuid, plivoCall: updatedCall };
         } catch (error) {
-          logger.error("Failed to initiate call", error, "PlivoCall");
+          const statusCode = error?.statusCode || error?.response?.status || error?.status;
+          const responseBody = error?.response?.data || error?.body || error?.message;
+          logger.error(`Failed to initiate call \u2014 HTTP ${statusCode || "unknown"}: ${JSON.stringify(responseBody)}`, error, "PlivoCall");
+          if (statusCode === 403) {
+            logger.error("Plivo 403 Forbidden \u2014 check: (1) authId/authToken are correct, (2) fromNumber is active on this account, (3) account has outbound calling enabled, (4) destination number is not blocked", void 0, "PlivoCall");
+            logger.error(`fromNumber used: ${params.fromNumber} | toNumber: ${params.toNumber}`, void 0, "PlivoCall");
+          }
           await OpenAIPoolService.releaseSlot(openaiCredential.id);
           await db.update(plivoCalls).set({
             status: "failed",
             endedAt: /* @__PURE__ */ new Date(),
             metadata: {
               ...callRecord.metadata || {},
-              error: error.message
+              error: error.message,
+              httpStatus: statusCode
             }
           }).where(eq26(plivoCalls.id, callRecord.id));
           throw new Error(`Failed to initiate call: ${error.message}`);
@@ -22221,13 +20663,13 @@ var init_plivo_call_service = __esm({
           if (call.campaignId) {
             if (status === "completed") {
               await db.update(campaigns).set({
-                completedCalls: sql23`${campaigns.completedCalls} + 1`,
-                successfulCalls: sql23`${campaigns.successfulCalls} + 1`
+                completedCalls: sql18`${campaigns.completedCalls} + 1`,
+                successfulCalls: sql18`${campaigns.successfulCalls} + 1`
               }).where(eq26(campaigns.id, call.campaignId));
             } else if (["busy", "failed", "no-answer"].includes(status)) {
               await db.update(campaigns).set({
-                completedCalls: sql23`${campaigns.completedCalls} + 1`,
-                failedCalls: sql23`${campaigns.failedCalls} + 1`
+                completedCalls: sql18`${campaigns.completedCalls} + 1`,
+                failedCalls: sql18`${campaigns.failedCalls} + 1`
               }).where(eq26(campaigns.id, call.campaignId));
             }
           }
@@ -22398,7 +20840,7 @@ var init_plivo_call_service = __esm({
               logger.error(`Failed to create CRM lead: ${crmError.message}`, crmError, "PlivoCall");
             }
           }
-          if (status === "completed" && call.userId && call.agentId) {
+          if (status === "completed" && call.userId && call.agentId && (durationSeconds ?? 0) > 0) {
             try {
               const callerPhone = call.callDirection === "inbound" ? call.fromNumber || metadata?.from || "" : call.toNumber || metadata?.to || "";
               const { triggerPostCallMessaging: triggerPostCallMessaging2 } = await Promise.resolve().then(() => (init_post_call_messaging(), post_call_messaging_exports));
@@ -22745,10 +21187,10 @@ var init_plivo_call_service = __esm({
        * Get active calls count for a user
        */
       static async getActiveCallsCount(userId) {
-        const [result] = await db.select({ count: sql23`count(*)::int` }).from(plivoCalls).where(
+        const [result] = await db.select({ count: sql18`count(*)::int` }).from(plivoCalls).where(
           and19(
             eq26(plivoCalls.userId, userId),
-            sql23`${plivoCalls.status} IN ('pending', 'initiated', 'ringing', 'in-progress')`
+            sql18`${plivoCalls.status} IN ('pending', 'initiated', 'ringing', 'in-progress')`
           )
         );
         return result?.count || 0;
@@ -22758,11 +21200,11 @@ var init_plivo_call_service = __esm({
        */
       static async getCallStats(userId) {
         const [stats] = await db.select({
-          totalCalls: sql23`count(*)::int`,
-          completedCalls: sql23`count(*) filter (where status = 'completed')::int`,
-          failedCalls: sql23`count(*) filter (where status in ('failed', 'busy', 'no-answer'))::int`,
-          totalDuration: sql23`coalesce(sum(duration), 0)::int`,
-          avgLeadScore: sql23`coalesce(avg(lead_quality_score), 0)::float`
+          totalCalls: sql18`count(*)::int`,
+          completedCalls: sql18`count(*) filter (where status = 'completed')::int`,
+          failedCalls: sql18`count(*) filter (where status in ('failed', 'busy', 'no-answer'))::int`,
+          totalDuration: sql18`coalesce(sum(duration), 0)::int`,
+          avgLeadScore: sql18`coalesce(avg(lead_quality_score), 0)::float`
         }).from(plivoCalls).where(eq26(plivoCalls.userId, userId));
         return {
           totalCalls: stats?.totalCalls || 0,
@@ -22840,8 +21282,8 @@ var init_plivo_call_service = __esm({
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1e3);
         const stuckCalls = await db.select().from(plivoCalls).where(
           and19(
-            sql23`${plivoCalls.status} IN ('initiated', 'pending')`,
-            sql23`${plivoCalls.createdAt} < ${fiveMinutesAgo}`
+            sql18`${plivoCalls.status} IN ('initiated', 'pending')`,
+            sql18`${plivoCalls.createdAt} < ${fiveMinutesAgo}`
           )
         ).limit(20);
         if (stuckCalls.length === 0) {
@@ -23082,9 +21524,14 @@ ${params.systemPrompt}`;
        * Creates appointments in database directly
        */
       static addAppointmentTool(config2, userId, agentId, callId, callerPhone) {
-        if (config2.tools?.some((t) => t.name === "book_appointment")) {
-          console.log(`[Agent Factory] Appointment tool already exists, skipping`);
+        const existingApptTool = config2.tools?.find((t) => t.name === "book_appointment");
+        if (existingApptTool?.handler) {
+          console.log(`[Agent Factory] Appointment tool already exists with handler, skipping`);
           return config2;
+        }
+        if (existingApptTool) {
+          console.log(`[Agent Factory] Appointment tool exists without handler \u2014 replacing with live handler`);
+          config2 = { ...config2, tools: config2.tools?.filter((t) => t.name !== "book_appointment") };
         }
         console.log(`[Agent Factory] Adding appointment tool for agent ${agentId}`);
         if (callerPhone) {
@@ -23137,6 +21584,40 @@ ${params.systemPrompt}`;
               if (callerPhone && (!params.contactPhone || params.contactPhone === "USE_CALLER_NUMBER" || params.contactPhone === "same")) {
                 params.contactPhone = callerPhone;
                 console.log(`[Appointment Tool] Auto-filled caller phone: ${callerPhone}`);
+              }
+              if (params.appointmentDate) {
+                const raw = String(params.appointmentDate).trim();
+                const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!isoMatch) {
+                  const parsed = new Date(raw);
+                  if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+                    const d = String(parsed.getDate()).padStart(2, "0");
+                    params.appointmentDate = `${y}-${m}-${d}`;
+                  }
+                }
+              }
+              if (params.appointmentTime) {
+                const raw = String(params.appointmentTime).trim();
+                const hhmm = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?$/i);
+                if (hhmm) {
+                  let h = parseInt(hhmm[1], 10);
+                  const min = hhmm[2];
+                  const meridiem = (hhmm[4] || "").toLowerCase();
+                  if (meridiem === "pm" && h < 12) h += 12;
+                  if (meridiem === "am" && h === 12) h = 0;
+                  params.appointmentTime = `${String(h).padStart(2, "0")}:${min}`;
+                } else {
+                  const short = raw.match(/^(\d{1,2})\s*(am|pm)$/i);
+                  if (short) {
+                    let h = parseInt(short[1], 10);
+                    const meridiem = short[2].toLowerCase();
+                    if (meridiem === "pm" && h < 12) h += 12;
+                    if (meridiem === "am" && h === 12) h = 0;
+                    params.appointmentTime = `${String(h).padStart(2, "0")}:00`;
+                  }
+                }
               }
               console.log(`[Appointment Tool] Booking: ${JSON.stringify(params)}`);
               if (!params.contactName || !params.contactPhone || !params.appointmentDate || !params.appointmentTime) {
@@ -23249,6 +21730,8 @@ ${params.systemPrompt}`;
                   };
                 }
               }
+              console.log(`[Appointment Tool] \u2705 All checks passed. Inserting into DB: userId=${userId} callId=${callId || "none"} agentId=${agentId}`);
+              console.log(`[Appointment Tool]    \u2192 name="${params.contactName}" phone="${params.contactPhone}" date="${params.appointmentDate}" time="${params.appointmentTime}"`);
               const appointmentId = nanoid3();
               const [newAppointment] = await db.insert(appointments).values({
                 id: appointmentId,
@@ -23266,17 +21749,22 @@ ${params.systemPrompt}`;
                 status: "scheduled",
                 metadata: { source: "openai-agent", agentId }
               }).returning();
-              console.log(`[Appointment Tool] Created appointment ${appointmentId}`);
+              if (newAppointment) {
+                console.log(`[Appointment Tool] \u{1F389} SUCCESS: appointment ${appointmentId} saved to DB`);
+              } else {
+                console.error(`[Appointment Tool] \u274C DB insert returned no rows \u2014 possible constraint violation`);
+              }
               return {
                 success: true,
                 appointmentId,
                 message: `Appointment booked for ${params.contactName} on ${params.appointmentDate} at ${params.appointmentTime}`
               };
             } catch (error) {
-              console.error(`[Appointment Tool] Error:`, error.message, error.stack);
+              console.error(`[Appointment Tool] \u274C DB ERROR: ${error.message}`);
+              console.error(`[Appointment Tool]    Stack: ${error.stack}`);
               return {
                 success: false,
-                message: "Unable to book appointment at this time. Please try again."
+                message: "Unable to book appointment at this time. Do NOT retry. Tell the caller there was a technical issue and continue the conversation."
               };
             }
           }
@@ -24581,7 +23069,7 @@ __export(hydrator_exports, {
   hydrateCompiledTools: () => hydrateCompiledTools,
   substituteContactVariables: () => substituteContactVariables2
 });
-import { eq as eq28, and as and21, sql as sql24 } from "drizzle-orm";
+import { eq as eq28, and as and21, sql as sql19 } from "drizzle-orm";
 import { nanoid as nanoid4 } from "nanoid";
 async function markCallGoogleSheetsWarning(callId, sheetId, sheetTab, errorMessage) {
   if (!callId) return;
@@ -24596,12 +23084,12 @@ async function markCallGoogleSheetsWarning(callId, sheetId, sheetTab, errorMessa
   for (const table of callTables) {
     try {
       const rows = await db.execute(
-        sql24`SELECT id FROM ${sql24.identifier(table)} WHERE id = ${callId} LIMIT 1`
+        sql19`SELECT id FROM ${sql19.identifier(table)} WHERE id = ${callId} LIMIT 1`
       );
       const exists = (Array.isArray(rows) ? rows : rows.rows || []).length > 0;
       if (exists) {
         await db.execute(
-          sql24`UPDATE ${sql24.identifier(table)} SET metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify(warning)}::jsonb WHERE id = ${callId}`
+          sql19`UPDATE ${sql19.identifier(table)} SET metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify(warning)}::jsonb WHERE id = ${callId}`
         );
         console.log(`[Sheets Warning] Wrote googleSheetsWarning to ${table} call ${callId}`);
         return;
@@ -24707,6 +23195,30 @@ function createAppointmentHandler(userId, agentId, callId, googleSheetId, google
         saturday: { start: "09:00", end: "17:00", enabled: false },
         sunday: { start: "09:00", end: "17:00", enabled: false }
       };
+      if (params.appointmentDate) {
+        const raw = String(params.appointmentDate).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const parsed = new Date(raw);
+          if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear();
+            const mo = String(parsed.getMonth() + 1).padStart(2, "0");
+            const d = String(parsed.getDate()).padStart(2, "0");
+            params.appointmentDate = `${y}-${mo}-${d}`;
+          }
+        }
+      }
+      if (params.appointmentTime) {
+        const raw = String(params.appointmentTime).trim();
+        const ampm = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+        if (ampm) {
+          let h = parseInt(ampm[1], 10);
+          const m = parseInt(ampm[2] || "0", 10);
+          const isPm = ampm[3].toLowerCase() === "pm";
+          if (isPm && h !== 12) h += 12;
+          if (!isPm && h === 12) h = 0;
+          params.appointmentTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+        }
+      }
       const appointmentDate = params.appointmentDate;
       const appointmentTime = params.appointmentTime;
       const parsedDate = /* @__PURE__ */ new Date(appointmentDate + "T12:00:00");
@@ -24989,8 +23501,8 @@ function createMessagingEmailHandler(userId, agentId, callId, templateName, defa
           message: "Please provide the recipient email address before sending the email."
         };
       }
-      const { EmailTemplateService: EmailTemplateService2 } = await Promise.resolve().then(() => (init_email_template_service(), email_template_service_exports));
-      const emailService2 = new EmailTemplateService2();
+      const { EmailTemplateService } = await import("../../../plugins/messaging/services/email-template.service");
+      const emailService2 = new EmailTemplateService();
       const dynamicVars = params.dynamic_variables || {};
       const result = await emailService2.sendEmailByName(
         userId,
@@ -25021,12 +23533,12 @@ function createMessagingWhatsAppHandler(userId, agentId, callId, templateName, l
       const lang = language || "en_US";
       if (!phoneNumber && callId) {
         try {
-          const { sql: sql58 } = await import("drizzle-orm");
+          const { sql: sql52 } = await import("drizzle-orm");
           const sanitizedCallId = callId.replace(/[^a-zA-Z0-9_-]/g, "");
           const callTables = ["calls", "twilio_openai_calls", "plivo_calls", "sip_calls"];
           for (const table of callTables) {
             const rows = await db.execute(
-              sql58`SELECT caller_number, from_number FROM ${sql58.identifier(table)} WHERE id = ${sanitizedCallId} LIMIT 1`
+              sql52`SELECT caller_number, from_number FROM ${sql52.identifier(table)} WHERE id = ${sanitizedCallId} LIMIT 1`
             );
             const row = (Array.isArray(rows) ? rows : rows.rows || [])[0];
             if (row?.caller_number || row?.from_number) {
@@ -25409,7 +23921,7 @@ var init_hydrator = __esm({
 });
 
 // server/engines/plivo/services/plivo-batch-calling.service.ts
-import { eq as eq29, and as and22, inArray as inArray7, sql as sql25, ne, desc as desc10 } from "drizzle-orm";
+import { eq as eq29, and as and22, inArray as inArray7, sql as sql20, ne, desc as desc10 } from "drizzle-orm";
 var MAX_CAPACITY_WAIT_MS, STUCK_CONTACT_TIMEOUT_MS, PlivoBatchCallingService;
 var init_plivo_batch_calling_service = __esm({
   "server/engines/plivo/services/plivo-batch-calling.service.ts"() {
@@ -25500,7 +24012,7 @@ var init_plivo_batch_calling_service = __esm({
           const CONTACT_BATCH_SIZE = 500;
           const statusCounts = await db.select({
             status: contacts.status,
-            count: sql25`count(*)::int`
+            count: sql20`count(*)::int`
           }).from(contacts).where(eq29(contacts.campaignId, campaignId)).groupBy(contacts.status);
           const totalCount = statusCounts.reduce((sum, s) => sum + s.count, 0);
           if (totalCount === 0) {
@@ -25552,7 +24064,7 @@ var init_plivo_batch_calling_service = __esm({
           const duration = this.startTime ? Math.floor((Date.now() - this.startTime.getTime()) / 1e3) : 0;
           const finalStatusCounts = await db.select({
             status: contacts.status,
-            count: sql25`count(*)::int`
+            count: sql20`count(*)::int`
           }).from(contacts).where(eq29(contacts.campaignId, campaignId)).groupBy(contacts.status);
           const dbCompletedCount = finalStatusCounts.find((s) => s.status === "completed")?.count || 0;
           const dbFailedCount = finalStatusCounts.find((s) => s.status === "failed")?.count || 0;
@@ -26393,9 +24905,14 @@ ${params.systemPrompt}`;
        * Creates appointments in database directly
        */
       static addAppointmentTool(config2, userId, agentId, callId, callerPhone) {
-        if (config2.tools?.some((t) => t.name === "book_appointment")) {
-          console.log(`[Agent Factory] Appointment tool already exists, skipping`);
+        const existingApptTool = config2.tools?.find((t) => t.name === "book_appointment");
+        if (existingApptTool?.handler) {
+          console.log(`[Agent Factory] Appointment tool already exists with handler, skipping`);
           return config2;
+        }
+        if (existingApptTool) {
+          console.log(`[Agent Factory] Appointment tool exists without handler \u2014 replacing with live handler`);
+          config2 = { ...config2, tools: config2.tools?.filter((t) => t.name !== "book_appointment") };
         }
         console.log(`[Agent Factory] Adding appointment tool for agent ${agentId}`);
         if (callerPhone) {
@@ -26448,6 +24965,40 @@ ${params.systemPrompt}`;
               if (callerPhone && (!params.contactPhone || params.contactPhone === "USE_CALLER_NUMBER" || params.contactPhone === "same")) {
                 params.contactPhone = callerPhone;
                 console.log(`[Appointment Tool] Auto-filled caller phone: ${callerPhone}`);
+              }
+              if (params.appointmentDate) {
+                const raw = String(params.appointmentDate).trim();
+                const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                if (!isoMatch) {
+                  const parsed = new Date(raw);
+                  if (!isNaN(parsed.getTime())) {
+                    const y = parsed.getFullYear();
+                    const m = String(parsed.getMonth() + 1).padStart(2, "0");
+                    const d = String(parsed.getDate()).padStart(2, "0");
+                    params.appointmentDate = `${y}-${m}-${d}`;
+                  }
+                }
+              }
+              if (params.appointmentTime) {
+                const raw = String(params.appointmentTime).trim();
+                const hhmm = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?$/i);
+                if (hhmm) {
+                  let h = parseInt(hhmm[1], 10);
+                  const min = hhmm[2];
+                  const meridiem = (hhmm[4] || "").toLowerCase();
+                  if (meridiem === "pm" && h < 12) h += 12;
+                  if (meridiem === "am" && h === 12) h = 0;
+                  params.appointmentTime = `${String(h).padStart(2, "0")}:${min}`;
+                } else {
+                  const short = raw.match(/^(\d{1,2})\s*(am|pm)$/i);
+                  if (short) {
+                    let h = parseInt(short[1], 10);
+                    const meridiem = short[2].toLowerCase();
+                    if (meridiem === "pm" && h < 12) h += 12;
+                    if (meridiem === "am" && h === 12) h = 0;
+                    params.appointmentTime = `${String(h).padStart(2, "0")}:00`;
+                  }
+                }
               }
               console.log(`[Appointment Tool] Booking: ${JSON.stringify(params)}`);
               if (!params.contactName || !params.contactPhone || !params.appointmentDate || !params.appointmentTime) {
@@ -26587,7 +25138,7 @@ ${params.systemPrompt}`;
               console.error(`[Appointment Tool] Error:`, error.message, error.stack);
               return {
                 success: false,
-                message: "Unable to book appointment at this time. Please try again."
+                message: "Unable to book appointment at this time. Do NOT retry. Tell the caller there was a technical issue and continue the conversation."
               };
             }
           }
@@ -28460,247 +27011,6 @@ var init_infrastructure = __esm({
   }
 });
 
-// plugins/messaging/services/whatsapp-conversation.service.ts
-var whatsapp_conversation_service_exports = {};
-__export(whatsapp_conversation_service_exports, {
-  WhatsAppConversationService: () => WhatsAppConversationService,
-  whatsAppConversationService: () => whatsAppConversationService
-});
-import { sql as sql26 } from "drizzle-orm";
-function snakeToCamel5(str) {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-}
-function transformRow5(row) {
-  const transformed = {};
-  for (const key of Object.keys(row)) {
-    transformed[snakeToCamel5(key)] = row[key];
-  }
-  return transformed;
-}
-function normalizePhone2(phone) {
-  return phone.replace(/[^0-9]/g, "");
-}
-var WhatsAppConversationService, whatsAppConversationService;
-var init_whatsapp_conversation_service = __esm({
-  "plugins/messaging/services/whatsapp-conversation.service.ts"() {
-    "use strict";
-    init_db();
-    WhatsAppConversationService = class {
-      async getOrCreateConversation(userId, contactPhone, contactName, contactWaId) {
-        const normalizedPhone = normalizePhone2(contactPhone);
-        const name = contactName || "";
-        const waId = contactWaId || "";
-        const result = await db.execute(sql26`
-      INSERT INTO whatsapp_conversations (user_id, contact_phone, contact_name, contact_wa_id)
-      VALUES (${userId}, ${normalizedPhone}, ${name}, ${waId})
-      ON CONFLICT (user_id, contact_phone) DO UPDATE SET
-        contact_name = CASE WHEN EXCLUDED.contact_name != '' THEN EXCLUDED.contact_name ELSE whatsapp_conversations.contact_name END,
-        contact_wa_id = CASE WHEN EXCLUDED.contact_wa_id != '' THEN EXCLUDED.contact_wa_id ELSE whatsapp_conversations.contact_wa_id END,
-        updated_at = NOW()
-      RETURNING *
-    `);
-        return transformRow5(result.rows[0]);
-      }
-      async getConversations(userId, options = {}) {
-        const limit = options.limit || 50;
-        const offset = options.offset || 0;
-        let whereClause = sql26`WHERE user_id = ${userId}`;
-        if (options.status) {
-          whereClause = sql26`${whereClause} AND status = ${options.status}`;
-        }
-        if (options.search) {
-          const searchPattern = `%${options.search}%`;
-          whereClause = sql26`${whereClause} AND (contact_phone ILIKE ${searchPattern} OR contact_name ILIKE ${searchPattern})`;
-        }
-        const countResult = await db.execute(sql26`
-      SELECT COUNT(*)::int as total FROM whatsapp_conversations ${whereClause}
-    `);
-        const total = countResult.rows[0]?.total || 0;
-        const result = await db.execute(sql26`
-      SELECT * FROM whatsapp_conversations ${whereClause}
-      ORDER BY last_message_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `);
-        const conversations = (result.rows || []).map(
-          (row) => transformRow5(row)
-        );
-        return { conversations, total };
-      }
-      async getConversation(userId, conversationId) {
-        const result = await db.execute(sql26`
-      SELECT * FROM whatsapp_conversations WHERE id = ${conversationId} AND user_id = ${userId} LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow5(row) : null;
-      }
-      async getMessages(conversationId, options = {}) {
-        const limit = options.limit || 50;
-        let query;
-        if (options.before) {
-          query = sql26`
-        SELECT * FROM whatsapp_messages
-        WHERE conversation_id = ${conversationId} AND created_at < ${options.before}
-        ORDER BY created_at ASC
-        LIMIT ${limit}
-      `;
-        } else {
-          query = sql26`
-        SELECT * FROM (
-          SELECT * FROM whatsapp_messages
-          WHERE conversation_id = ${conversationId}
-          ORDER BY created_at DESC
-          LIMIT ${limit}
-        ) sub ORDER BY created_at ASC
-      `;
-        }
-        const result = await db.execute(query);
-        return (result.rows || []).map(
-          (row) => transformRow5(row)
-        );
-      }
-      async addMessage(data) {
-        const messageType = data.messageType || "text";
-        const content = data.content || "";
-        const status = data.status || "sent";
-        const metadata = data.metadata ? JSON.stringify(data.metadata) : "{}";
-        const preview = content.substring(0, 100);
-        const result = await db.execute(sql26`
-      INSERT INTO whatsapp_messages (
-        conversation_id, user_id, direction, sender_type, message_type,
-        content, meta_message_id, template_name, media_url, media_mime_type,
-        status, metadata
-      ) VALUES (
-        ${data.conversationId}, ${data.userId}, ${data.direction}, ${data.senderType}, ${messageType},
-        ${content}, ${data.metaMessageId || null}, ${data.templateName || null}, ${data.mediaUrl || null}, ${data.mediaMimeType || null},
-        ${status}, ${metadata}::jsonb
-      )
-      RETURNING *
-    `);
-        if (data.direction === "inbound") {
-          await db.execute(sql26`
-        UPDATE whatsapp_conversations SET
-          last_message_at = NOW(),
-          last_message_preview = ${preview},
-          unread_count = unread_count + 1,
-          updated_at = NOW()
-        WHERE id = ${data.conversationId}
-      `);
-        } else {
-          await db.execute(sql26`
-        UPDATE whatsapp_conversations SET
-          last_message_at = NOW(),
-          last_message_preview = ${preview},
-          updated_at = NOW()
-        WHERE id = ${data.conversationId}
-      `);
-        }
-        return transformRow5(result.rows[0]);
-      }
-      async updateMessageStatus(metaMessageId, status, errorMessage) {
-        await db.execute(sql26`
-      UPDATE whatsapp_messages SET
-        status = ${status},
-        error_message = ${errorMessage || null}
-      WHERE meta_message_id = ${metaMessageId}
-    `);
-      }
-      async markRead(userId, conversationId) {
-        await db.execute(sql26`
-      UPDATE whatsapp_conversations SET
-        unread_count = 0,
-        updated_at = NOW()
-      WHERE id = ${conversationId} AND user_id = ${userId}
-    `);
-      }
-      async updateConversationStatus(userId, conversationId, status) {
-        await db.execute(sql26`
-      UPDATE whatsapp_conversations SET
-        status = ${status},
-        updated_at = NOW()
-      WHERE id = ${conversationId} AND user_id = ${userId}
-    `);
-      }
-      async setAutoReply(userId, conversationId, enabled, agentId) {
-        await db.execute(sql26`
-      UPDATE whatsapp_conversations SET
-        auto_reply_enabled = ${enabled},
-        assigned_agent_id = ${agentId || null},
-        updated_at = NOW()
-      WHERE id = ${conversationId} AND user_id = ${userId}
-    `);
-      }
-      async refreshWindow(conversationId) {
-        await db.execute(sql26`
-      UPDATE whatsapp_conversations SET
-        window_expires_at = NOW() + INTERVAL '24 hours',
-        updated_at = NOW()
-      WHERE id = ${conversationId}
-    `);
-      }
-      isWindowOpen(conversation) {
-        if (!conversation.windowExpiresAt) return false;
-        return new Date(conversation.windowExpiresAt) > /* @__PURE__ */ new Date();
-      }
-      async getConversationByPhone(userId, contactPhone) {
-        const normalized = normalizePhone2(contactPhone);
-        const result = await db.execute(sql26`
-      SELECT * FROM whatsapp_conversations
-      WHERE user_id = ${userId} AND contact_phone = ${normalized}
-      LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? transformRow5(row) : null;
-      }
-      async findUserByPhoneNumberId(phoneNumberId) {
-        const result = await db.execute(sql26`
-      SELECT user_id FROM meta_whatsapp_settings
-      WHERE phone_number_id = ${phoneNumberId} AND is_active = true
-      LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? row.user_id : null;
-      }
-      async findUserByWabaId(wabaId) {
-        const result = await db.execute(sql26`
-      SELECT user_id, phone_number_id FROM meta_whatsapp_settings
-      WHERE waba_id = ${wabaId} AND is_active = true
-      LIMIT 1
-    `);
-        const row = result.rows[0];
-        return row ? { userId: row.user_id, phoneNumberId: row.phone_number_id } : null;
-      }
-      async updatePhoneNumberId(userId, newPhoneNumberId) {
-        await db.execute(sql26`
-      UPDATE meta_whatsapp_settings SET
-        phone_number_id = ${newPhoneNumberId},
-        updated_at = NOW()
-      WHERE user_id = ${userId}
-    `);
-      }
-      async isDuplicateMessage(metaMessageId) {
-        if (!metaMessageId) return false;
-        const result = await db.execute(sql26`
-      SELECT 1 FROM whatsapp_messages WHERE meta_message_id = ${metaMessageId} LIMIT 1
-    `);
-        return (result.rows || []).length > 0;
-      }
-      async getConversationUpdates(userId, since) {
-        const result = await db.execute(sql26`
-      SELECT id, unread_count, last_message_at, last_message_preview, status, updated_at, window_expires_at,
-             contact_phone, contact_name, contact_wa_id, user_id, assigned_agent_id, auto_reply_enabled, created_at
-      FROM whatsapp_conversations
-      WHERE user_id = ${userId} AND updated_at > ${since}
-      ORDER BY last_message_at DESC
-    `);
-        return (result.rows || []).map(
-          (row) => transformRow5(row)
-        );
-      }
-    };
-    whatsAppConversationService = new WhatsAppConversationService();
-  }
-});
-
 // server/engines/twilio-openai/services/audio-bridge.service.ts
 import WebSocket4 from "ws";
 import axios2 from "axios";
@@ -29721,8 +28031,8 @@ ERROR HANDLING \u2014 MANDATORY:
             autoVars.contact_name = params.contact_name;
           }
           const mergedVariables = { ...autoVars, ...dynamicVariables };
-          const { emailTemplateService: emailTemplateService2 } = await Promise.resolve().then(() => (init_email_template_service(), email_template_service_exports));
-          const result = await emailTemplateService2.sendEmailByName(
+          const { emailTemplateService } = await import("../../../../plugins/messaging/services/email-template.service");
+          const result = await emailTemplateService.sendEmailByName(
             ctx.userId,
             templateName,
             recipientEmail,
@@ -29792,15 +28102,15 @@ ERROR HANDLING \u2014 MANDATORY:
           components = [{ type: "body", parameters }];
         }
         try {
-          const { metaWhatsAppService: metaWhatsAppService2, MetaWhatsAppService: MetaWhatsAppService2 } = await Promise.resolve().then(() => (init_meta_whatsapp_service(), meta_whatsapp_service_exports));
-          const { whatswayService: whatswayService2 } = await Promise.resolve().then(() => (init_whatsway_service(), whatsway_service_exports));
-          const metaSettings = await metaWhatsAppService2.getSettings(ctx.userId);
-          const whatswaySettings = await whatswayService2.getSettings(ctx.userId);
+          const { metaWhatsAppService, MetaWhatsAppService } = await import("../../../../plugins/messaging/services/meta-whatsapp.service");
+          const { whatswayService } = await import("../../../../plugins/messaging/services/whatsway.service");
+          const metaSettings = await metaWhatsAppService.getSettings(ctx.userId);
+          const whatswaySettings = await whatswayService.getSettings(ctx.userId);
           if (metaSettings?.isActive) {
             try {
-              const templateDef = await metaWhatsAppService2.getTemplateByName(ctx.userId, templateName);
+              const templateDef = await metaWhatsAppService.getTemplateByName(ctx.userId, templateName);
               if (templateDef && templateDef.components) {
-                const buttonComponents = MetaWhatsAppService2.buildButtonComponents(templateDef.components, ctx.fixedButtonVariables);
+                const buttonComponents = MetaWhatsAppService.buildButtonComponents(templateDef.components, ctx.fixedButtonVariables);
                 if (buttonComponents.length > 0) {
                   components = [...components, ...buttonComponents];
                   console.log(`[TwilioOpenAI Bridge] Auto-added ${buttonComponents.length} button component(s) for template "${templateName}"`);
@@ -29812,7 +28122,7 @@ ERROR HANDLING \u2014 MANDATORY:
           }
           let sendResult;
           if (metaSettings?.isActive) {
-            sendResult = await metaWhatsAppService2.sendTemplate(
+            sendResult = await metaWhatsAppService.sendTemplate(
               ctx.userId,
               recipientPhone,
               templateName,
@@ -29821,7 +28131,7 @@ ERROR HANDLING \u2014 MANDATORY:
               { callId: ctx.callId, agentId: ctx.agentId }
             );
           } else if (whatswaySettings?.isActive) {
-            sendResult = await whatswayService2.sendTemplate(
+            sendResult = await whatswayService.sendTemplate(
               ctx.userId,
               recipientPhone,
               templateName,
@@ -29833,9 +28143,9 @@ ERROR HANDLING \u2014 MANDATORY:
             return { success: false, message: "No WhatsApp provider configured." };
           }
           try {
-            const { whatsAppConversationService: whatsAppConversationService2 } = await Promise.resolve().then(() => (init_whatsapp_conversation_service(), whatsapp_conversation_service_exports));
-            const conversation = await whatsAppConversationService2.getOrCreateConversation(ctx.userId, recipientPhone);
-            await whatsAppConversationService2.addMessage({
+            const { whatsAppConversationService } = await import("../../../../plugins/messaging/services/whatsapp-conversation.service");
+            const conversation = await whatsAppConversationService.getOrCreateConversation(ctx.userId, recipientPhone);
+            await whatsAppConversationService.addMessage({
               conversationId: conversation.id,
               userId: ctx.userId,
               direction: "outbound",
@@ -31379,7 +29689,7 @@ var init_twilio_openai_call_service = __esm({
 });
 
 // server/engines/twilio-openai/services/twilio-openai-batch-calling.service.ts
-import { eq as eq37, inArray as inArray9, ne as ne2, and as and26, sql as sql27, desc as desc11 } from "drizzle-orm";
+import { eq as eq37, inArray as inArray9, ne as ne2, and as and26, sql as sql21, desc as desc11 } from "drizzle-orm";
 var DEFAULT_CONCURRENT_CALLS, DEFAULT_CALL_DELAY_MS, DEFAULT_MAX_CALL_DURATION, MAX_CAPACITY_WAIT_MS2, STUCK_CONTACT_TIMEOUT_MS2, TwilioOpenAIBatchCallingService;
 var init_twilio_openai_batch_calling_service = __esm({
   "server/engines/twilio-openai/services/twilio-openai-batch-calling.service.ts"() {
@@ -31459,7 +29769,7 @@ var init_twilio_openai_batch_calling_service = __esm({
           const CONTACT_BATCH_SIZE = 500;
           const statusCounts = await db.select({
             status: contacts.status,
-            count: sql27`count(*)::int`
+            count: sql21`count(*)::int`
           }).from(contacts).where(eq37(contacts.campaignId, campaignId)).groupBy(contacts.status);
           const totalCount = statusCounts.reduce((sum, s) => sum + s.count, 0);
           if (totalCount === 0) {
@@ -31512,7 +29822,7 @@ var init_twilio_openai_batch_calling_service = __esm({
           const duration = this.startTime ? Math.floor((Date.now() - this.startTime.getTime()) / 1e3) : 0;
           const finalStatusCounts = await db.select({
             status: contacts.status,
-            count: sql27`count(*)::int`
+            count: sql21`count(*)::int`
           }).from(contacts).where(eq37(contacts.campaignId, campaignId)).groupBy(contacts.status);
           const dbCompletedCount = finalStatusCounts.find((s) => s.status === "completed")?.count || 0;
           const dbFailedCount = finalStatusCounts.find((s) => s.status === "failed")?.count || 0;
@@ -32182,7 +30492,7 @@ __export(campaign_executor_exports, {
   CampaignExecutor: () => CampaignExecutor,
   campaignExecutor: () => campaignExecutor
 });
-import { eq as eq38, inArray as inArray10, sql as sql28, and as and27, isNotNull as isNotNull8, lte as lte5 } from "drizzle-orm";
+import { eq as eq38, inArray as inArray10, sql as sql22, and as and27, isNotNull as isNotNull8, lte as lte5 } from "drizzle-orm";
 function warnIfVeryLargeElevenLabsBatch(recipientCount, campaignName, campaignId) {
   if (recipientCount >= ELEVENLABS_BATCH_LARGE_RECIPIENT_WARN) {
     console.warn(
@@ -32724,7 +31034,7 @@ var init_campaign_executor = __esm({
             if (preCreatedCalls2.length > 0) {
               const callIds = preCreatedCalls2.map((c) => c.id);
               await db.update(calls).set({
-                metadata: sql28`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob2.id)}::jsonb)`
+                metadata: sql22`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob2.id)}::jsonb)`
               }).where(inArray10(calls.id, callIds));
               console.log(`   Updated ${callIds.length} call records with batch job ID`);
             }
@@ -32903,7 +31213,7 @@ var init_campaign_executor = __esm({
           if (preCreatedCalls.length > 0) {
             const callIds = preCreatedCalls.map((c) => c.id);
             await db.update(calls).set({
-              metadata: sql28`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob.id)}::jsonb)`
+              metadata: sql22`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob.id)}::jsonb)`
             }).where(inArray10(calls.id, callIds));
             console.log(`   Updated ${callIds.length} call records with batch job ID`);
           }
@@ -33193,7 +31503,7 @@ var init_campaign_executor = __esm({
           await db.update(campaigns).set({
             status: "paused",
             batchJobStatus: "paused",
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           console.log(`\u23F8\uFE0F [Campaign Executor] Paused Plivo campaign ${campaignId} (reason: ${reason})`);
           if (campaign.userId) {
@@ -33222,7 +31532,7 @@ var init_campaign_executor = __esm({
           await db.update(campaigns).set({
             status: "paused",
             batchJobStatus: "paused",
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           console.log(`\u23F8\uFE0F [Campaign Executor] Paused Twilio-OpenAI campaign ${campaignId} (reason: ${reason})`);
           if (campaign.userId) {
@@ -33281,7 +31591,7 @@ var init_campaign_executor = __esm({
           await db.update(campaigns).set({
             status: "paused",
             batchJobStatus: "cancelled",
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{pauseReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           if (campaign.userId) {
             webhookDeliveryService.triggerEvent(campaign.userId, "campaign.paused", {
@@ -33475,7 +31785,7 @@ var init_campaign_executor = __esm({
             status: "running",
             batchJobStatus: "running",
             completedAt: null,
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           const result = await plivoBatchService.executeCampaign(campaignId);
           console.log(`\u25B6\uFE0F [Campaign Executor] Resumed Plivo campaign ${campaignId} (reason: ${reason})`);
@@ -33516,7 +31826,7 @@ var init_campaign_executor = __esm({
             status: "running",
             batchJobStatus: "running",
             completedAt: null,
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           const result = await twilioOpenAIBatchService.executeCampaign(campaignId);
           console.log(`\u25B6\uFE0F [Campaign Executor] Resumed Twilio-OpenAI campaign ${campaignId} (reason: ${reason})`);
@@ -33563,7 +31873,7 @@ var init_campaign_executor = __esm({
             status: "running",
             batchJobStatus: batchJob.status,
             completedAt: null,
-            config: sql28`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
+            config: sql22`jsonb_set(COALESCE(config, '{}'::jsonb), '{resumeReason}', ${JSON.stringify(reason)}::jsonb)`
           }).where(eq38(campaigns.id, campaignId));
           return batchJob;
         } catch (error) {
@@ -33823,7 +32133,7 @@ var init_campaign_executor = __esm({
           if (preCreatedCalls2.length > 0) {
             const callIds = preCreatedCalls2.map((c) => c.id);
             await db.update(calls).set({
-              metadata: sql28`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob2.id)}::jsonb)`
+              metadata: sql22`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob2.id)}::jsonb)`
             }).where(inArray10(calls.id, callIds));
           }
           await db.update(campaigns).set({
@@ -34148,11 +32458,11 @@ var init_campaign_executor = __esm({
             eq38(contacts.campaignId, campaignId),
             isNotNull8(contacts.nextRetryAt),
             lte5(contacts.nextRetryAt, now),
-            retryStatuses.length > 0 ? inArray10(contacts.status, retryStatuses) : sql28`FALSE`,
+            retryStatuses.length > 0 ? inArray10(contacts.status, retryStatuses) : sql22`FALSE`,
             // Use <= maxAttempts because scheduleContactRetry already incremented the count
             // before the next call is created (so at execution time, count == maxAttempts is
             // still valid — we're about to make the maxAttempts-th call).
-            sql28`COALESCE(${contacts.attemptCount}, 1) <= ${maxAttempts}`
+            sql22`COALESCE(${contacts.attemptCount}, 1) <= ${maxAttempts}`
           )
         );
         if (dueContacts.length === 0) {
@@ -34439,7 +32749,7 @@ var init_campaign_executor = __esm({
         const preCreatedCalls = callResult.results;
         if (preCreatedCalls.length > 0) {
           await db.update(calls).set({
-            metadata: sql28`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob.id)}::jsonb)`
+            metadata: sql22`jsonb_set(COALESCE(metadata, '{}'::jsonb), '{batchJobId}', ${JSON.stringify(batchJob.id)}::jsonb)`
           }).where(inArray10(calls.id, preCreatedCalls.map((c) => c.id)));
         }
         await db.update(campaigns).set({
@@ -34470,7 +32780,7 @@ var init_campaign_executor = __esm({
 });
 
 // server/services/campaign-scheduler.ts
-import { eq as eq39, and as and28, isNotNull as isNotNull9, isNull as isNull7, sql as sql29, lte as lte6, inArray as inArray11 } from "drizzle-orm";
+import { eq as eq39, and as and28, isNotNull as isNotNull9, isNull as isNull7, sql as sql23, lte as lte6, inArray as inArray11 } from "drizzle-orm";
 function isBullMQEnabled() {
   return process.env.ENABLE_BULLMQ === "true" && !!process.env.REDIS_URL;
 }
@@ -34794,7 +33104,7 @@ var init_campaign_scheduler = __esm({
           const updatedCalls = await db.update(calls).set({
             status: "failed",
             endedAt: /* @__PURE__ */ new Date(),
-            metadata: sql29`COALESCE(${calls.metadata}, '{}'::jsonb) || ${JSON.stringify({ errorMessage: "Batch job expired or not found on ElevenLabs" })}::jsonb`
+            metadata: sql23`COALESCE(${calls.metadata}, '{}'::jsonb) || ${JSON.stringify({ errorMessage: "Batch job expired or not found on ElevenLabs" })}::jsonb`
           }).where(
             and28(
               eq39(calls.campaignId, campaignId),
@@ -34877,7 +33187,7 @@ var init_campaign_scheduler = __esm({
           updateData.elevenLabsConversationId = recipient.conversation_id;
         }
         if (recipient.error_message) {
-          updateData.metadata = sql29`COALESCE(${calls.metadata}, '{}'::jsonb) || ${JSON.stringify({ errorMessage: recipient.error_message })}::jsonb`;
+          updateData.metadata = sql23`COALESCE(${calls.metadata}, '{}'::jsonb) || ${JSON.stringify({ errorMessage: recipient.error_message })}::jsonb`;
         }
         await db.update(calls).set(updateData).where(eq39(calls.id, callId));
         if (contactId) {
@@ -34973,12 +33283,12 @@ var init_campaign_scheduler = __esm({
         const nextRetryAt = new Date(Date.now() + intervalMinutes * 60 * 1e3);
         const scheduledResult = await db.update(contacts).set({
           nextRetryAt,
-          attemptCount: sql29`COALESCE(${contacts.attemptCount}, 1) + 1`
+          attemptCount: sql23`COALESCE(${contacts.attemptCount}, 1) + 1`
         }).where(
           and28(
             eq39(contacts.campaignId, campaign.id),
             inArray11(contacts.status, retryStatuses),
-            sql29`COALESCE(${contacts.attemptCount}, 1) < ${maxAttempts}`,
+            sql23`COALESCE(${contacts.attemptCount}, 1) < ${maxAttempts}`,
             isNull7(contacts.nextRetryAt)
           )
         ).returning({ id: contacts.id });
@@ -35974,7 +34284,7 @@ __export(loader_exports, {
 import fs10 from "fs";
 import path10 from "path";
 import { fileURLToPath, pathToFileURL as pathToFileURL2 } from "url";
-import { eq as eq54, sql as sql41 } from "drizzle-orm";
+import { eq as eq54, sql as sql35 } from "drizzle-orm";
 function markPluginAsRegistered2(pluginName) {
   externallyRegisteredPlugins.add(pluginName);
 }
@@ -36165,7 +34475,7 @@ async function loadPlugins(app2, options) {
       const safeTables = requiredTables.filter((t) => SAFE_TABLE_NAME_RE.test(t));
       if (safeTables.length > 0) {
         try {
-          const tableCheckResult = await db.execute(sql41.raw(`
+          const tableCheckResult = await db.execute(sql35.raw(`
             SELECT table_name 
             FROM information_schema.tables 
             WHERE table_schema = 'public' 
@@ -36211,7 +34521,7 @@ async function loadPlugins(app2, options) {
                   }
                   try {
                     const migrationSql = fs10.readFileSync(migrationPath, "utf-8");
-                    await db.execute(sql41.raw(migrationSql));
+                    await db.execute(sql35.raw(migrationSql));
                     console.log(`[Plugin Loader] \u2705 Migration applied: ${migrationFile}`);
                   } catch (migErr) {
                     console.error(`[Plugin Loader] \u274C Migration failed for ${migrationFile}:`, migErr.message);
@@ -36669,7 +34979,7 @@ __export(plivo_phone_service_exports, {
   PlivoPhoneService: () => PlivoPhoneService
 });
 import * as plivo2 from "plivo";
-import { eq as eq62, and as and43, desc as desc16, sql as sql44 } from "drizzle-orm";
+import { eq as eq62, and as and43, desc as desc16, sql as sql38 } from "drizzle-orm";
 var PlivoPhoneService;
 var init_plivo_phone_service = __esm({
   "server/engines/plivo/services/plivo-phone.service.ts"() {
@@ -36891,7 +35201,7 @@ var init_plivo_phone_service = __esm({
           purchasedAt: /* @__PURE__ */ new Date()
         }).returning();
         await db.update(users).set({
-          credits: sql44`GREATEST(0, ${users.credits} - ${pricing.purchaseCredits})`
+          credits: sql38`GREATEST(0, ${users.credits} - ${pricing.purchaseCredits})`
         }).where(eq62(users.id, params.userId));
         await db.insert(creditTransactions).values({
           userId: params.userId,
@@ -36937,7 +35247,7 @@ var init_plivo_phone_service = __esm({
         const numbers = await db.select().from(plivoPhoneNumbers).where(
           and43(
             eq62(plivoPhoneNumbers.userId, userId),
-            sql44`${plivoPhoneNumbers.status} != 'released'`
+            sql38`${plivoPhoneNumbers.status} != 'released'`
           )
         ).orderBy(desc16(plivoPhoneNumbers.createdAt));
         return numbers;
@@ -37177,7 +35487,7 @@ var init_plivo_phone_service = __esm({
         const numbersDue = await db.select().from(plivoPhoneNumbers).where(
           and43(
             eq62(plivoPhoneNumbers.status, "active"),
-            sql44`${plivoPhoneNumbers.nextBillingDate} <= ${now}`
+            sql38`${plivoPhoneNumbers.nextBillingDate} <= ${now}`
           )
         );
         for (const number of numbersDue) {
@@ -37201,7 +35511,7 @@ var init_plivo_phone_service = __esm({
               continue;
             }
             await db.update(users).set({
-              credits: sql44`GREATEST(0, ${users.credits} - ${number.monthlyCredits})`
+              credits: sql38`GREATEST(0, ${users.credits} - ${number.monthlyCredits})`
             }).where(eq62(users.id, number.userId));
             await db.insert(creditTransactions).values({
               userId: number.userId,
@@ -37242,7 +35552,7 @@ var init_plivo_phone_service = __esm({
           throw new Error("Insufficient credits to reactivate");
         }
         await db.update(users).set({
-          credits: sql44`GREATEST(0, ${users.credits} - ${number.monthlyCredits})`
+          credits: sql38`GREATEST(0, ${users.credits} - ${number.monthlyCredits})`
         }).where(eq62(users.id, number.userId));
         await db.insert(creditTransactions).values({
           userId: number.userId,
@@ -37265,7 +35575,7 @@ var init_plivo_phone_service = __esm({
        * Get phone number statistics for admin dashboard
        */
       static async getPhoneStats() {
-        const numbers = await db.select().from(plivoPhoneNumbers).where(sql44`${plivoPhoneNumbers.status} != 'released'`);
+        const numbers = await db.select().from(plivoPhoneNumbers).where(sql38`${plivoPhoneNumbers.status} != 'released'`);
         const stats = {
           total: numbers.length,
           active: 0,
@@ -37495,7 +35805,7 @@ var init_plivo_phone_service = __esm({
        * Get all Plivo phone numbers in the system (admin view)
        */
       static async getAllNumbers() {
-        const numbers = await db.select().from(plivoPhoneNumbers).where(sql44`${plivoPhoneNumbers.status} != 'released'`).orderBy(desc16(plivoPhoneNumbers.createdAt));
+        const numbers = await db.select().from(plivoPhoneNumbers).where(sql38`${plivoPhoneNumbers.status} != 'released'`).orderBy(desc16(plivoPhoneNumbers.createdAt));
         return numbers;
       }
       /**
@@ -38526,7 +36836,7 @@ import path19 from "path";
 import fs20 from "fs";
 import AdmZip2 from "adm-zip";
 import multer10 from "multer";
-import { sql as sql51 } from "drizzle-orm";
+import { sql as sql45 } from "drizzle-orm";
 function sanitizeTableNames(tables) {
   return tables.filter((t) => SAFE_TABLE_NAME_RE2.test(t));
 }
@@ -38635,7 +36945,7 @@ var init_plugin_installer = __esm({
           if (requiredTables.length > 0) {
             try {
               const tableCheck = await db.execute(
-                sql51`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
+                sql45`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
               );
               const existing = new Set(tableCheck.rows.map((r) => r.table_name));
               tablesExist = requiredTables.filter((t) => existing.has(t));
@@ -38759,7 +37069,7 @@ var init_plugin_installer = __esm({
               let needsMigration = false;
               try {
                 const tableCheck = await db.execute(
-                  sql51`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
+                  sql45`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
                 );
                 const existing = new Set(tableCheck.rows.map((r) => r.table_name));
                 needsMigration = requiredTables.some((t) => !existing.has(t));
@@ -38798,7 +37108,7 @@ var init_plugin_installer = __esm({
                     }
                     try {
                       const migSql = fs20.readFileSync(migPath, "utf-8");
-                      await db.execute(sql51.raw(migSql));
+                      await db.execute(sql45.raw(migSql));
                       steps.push({ step: `migration_${migFile}`, status: "success", message: `Migration applied: ${migFile}` });
                     } catch (migErr) {
                       migrationSuccess = false;
@@ -38962,7 +37272,7 @@ var init_plugin_installer = __esm({
               }
               try {
                 const migSql = fs20.readFileSync(migPath, "utf-8");
-                await db.execute(sql51.raw(migSql));
+                await db.execute(sql45.raw(migSql));
                 steps.push({ file: migFile, status: "success", message: "Migration applied successfully" });
               } catch (err) {
                 steps.push({ file: migFile, status: "failed", message: err.message });
@@ -39004,7 +37314,7 @@ var init_plugin_installer = __esm({
             if (requiredTables.length > 0) {
               try {
                 const tableCheck = await db.execute(
-                  sql51`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
+                  sql45`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${requiredTables})`
                 );
                 const existing = new Set(tableCheck.rows.map((r) => r.table_name));
                 missingTables = requiredTables.filter((t) => !existing.has(t));
@@ -39071,7 +37381,7 @@ import { Router as Router37 } from "express";
 import path20 from "path";
 import fs21 from "fs";
 import { fileURLToPath as fileURLToPath3 } from "url";
-import { sql as sql52, eq as eq82 } from "drizzle-orm";
+import { sql as sql46, eq as eq82 } from "drizzle-orm";
 async function getAppName3() {
   try {
     const [row] = await db.select({ value: globalSettings.value }).from(globalSettings).where(eq82(globalSettings.key, "app_name")).limit(1);
@@ -39174,7 +37484,7 @@ var init_plugin_routes = __esm({
           if (safeTables.length > 0) {
             try {
               const tableCheckResult = await db.execute(
-                sql52`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${safeTables})`
+                sql46`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(${safeTables})`
               );
               const existingTables = new Set(
                 tableCheckResult.rows.map((r) => r.table_name)
@@ -40775,7 +39085,7 @@ init_db();
 init_schema();
 import { createServer } from "http";
 import { WebSocketServer as WebSocketServer4 } from "ws";
-import { eq as eq84, desc as desc20, and as and55, isNull as isNull17, sql as sql53 } from "drizzle-orm";
+import { eq as eq84, desc as desc20, and as and55, isNull as isNull17, sql as sql47 } from "drizzle-orm";
 
 // server/middleware/auth.ts
 import jwt2 from "jsonwebtoken";
@@ -41190,7 +39500,7 @@ init_storage();
 init_webhook_delivery();
 init_google_calendar_service();
 import { nanoid as nanoid2 } from "nanoid";
-import { eq as eq22, and as and17, inArray as inArray6, sql as sql21 } from "drizzle-orm";
+import { eq as eq22, and as and17, inArray as inArray6, sql as sql16 } from "drizzle-orm";
 import WebSocket2 from "ws";
 import twilio2 from "twilio";
 import crypto7 from "crypto";
@@ -42634,7 +40944,7 @@ async function handleTwilioStatusWebhook(req, res) {
     if (!callId) {
       if (CallSid) {
         try {
-          const sipCallResult = await db.execute(sql21`
+          const sipCallResult = await db.execute(sql16`
             SELECT id, status FROM sip_calls 
             WHERE external_call_id = ${CallSid} 
             OR elevenlabs_conversation_id = ${CallSid}
@@ -42656,7 +40966,7 @@ async function handleTwilioStatusWebhook(req, res) {
             const terminalStatuses = ["completed", "failed"];
             if (!terminalStatuses.includes(sipCall.status)) {
               const recUrl = RecordingUrl ? RecordingUrl.endsWith(".mp3") ? RecordingUrl : `${RecordingUrl}.mp3` : null;
-              await db.execute(sql21`
+              await db.execute(sql16`
                 UPDATE sip_calls SET 
                   status = ${sipStatus},
                   duration_seconds = COALESCE(${CallDuration ? parseInt(CallDuration, 10) : null}::int, duration_seconds),
@@ -42728,7 +41038,7 @@ async function handleTwilioStatusWebhook(req, res) {
         console.error(`\u274C [Status Webhook] Credit deduction failed for call ${callId}: ${creditResult.error}`);
         await db.update(calls).set({
           status: "failed",
-          metadata: sql21`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: creditResult.error })}`
+          metadata: sql16`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: creditResult.error })}`
         }).where(eq22(calls.id, callId));
         console.warn(`\u26A0\uFE0F [Status Webhook] Call ${callId} marked as failed due to credit deduction failure`);
         return res.status(200).json({
@@ -43213,7 +41523,7 @@ async function handleElevenLabsWebhook(req, res) {
               if (isTypeMismatchError(audioUpdateErr)) {
                 console.warn(`[ElevenLabs Webhook] Type mismatch on audio UPDATE, retrying with raw SQL`);
                 const metaJson = JSON.stringify(audioUpdateData.metadata);
-                await db.execute(sql21`
+                await db.execute(sql16`
                   UPDATE calls SET
                     recording_url = ${audioUpdateData.recordingUrl},
                     twilio_sid = ${audioUpdateData.twilioSid},
@@ -43226,13 +41536,13 @@ async function handleElevenLabsWebhook(req, res) {
             }
             console.log(`   \u2705 Updated call record: ${existingCall.id} (Twilio SID: ${twilioSid || "N/A"})`);
           } else {
-            const sipCallResult = await db.execute(sql21`
+            const sipCallResult = await db.execute(sql16`
               SELECT * FROM sip_calls WHERE elevenlabs_conversation_id = ${audioConvId} LIMIT 1
             `);
             const existingSipCall = sipCallResult.rows[0];
             if (existingSipCall) {
               console.log(`   \u{1F4DE} Found SIP call record: ${existingSipCall.id}`);
-              await db.execute(sql21`
+              await db.execute(sql16`
                 UPDATE sip_calls SET
                   metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({
                 hasElevenLabsRecording: !!(recording_url || audio_url),
@@ -43440,7 +41750,7 @@ async function handleElevenLabsWebhook(req, res) {
                 eq22(calls.callDirection, "outgoing"),
                 eq22(campaigns.agentId, agent.id)
               )
-            ).orderBy(sql21`${calls.createdAt} DESC`).limit(1);
+            ).orderBy(sql16`${calls.createdAt} DESC`).limit(1);
             if (pendingCallQuery.length > 0 && pendingCallQuery[0].call) {
               callRecord = pendingCallQuery[0].call;
               console.log(`   \u2705 Found matching pre-created batch call record: ${callRecord.id} (status: ${callRecord.status})`);
@@ -43451,7 +41761,7 @@ async function handleElevenLabsWebhook(req, res) {
             if (isTypeMismatchError(pendingQueryError)) {
               console.warn(`[ElevenLabs Webhook] Type mismatch on pending call lookup, retrying with raw SQL and uuid casting`);
               try {
-                const rawResult = await db.execute(sql21`
+                const rawResult = await db.execute(sql16`
                   SELECT c.* FROM calls c
                   LEFT JOIN campaigns camp ON c.campaign_id::text = camp.id::text
                   WHERE c.phone_number = ${webhookPhoneNumber}
@@ -43481,7 +41791,7 @@ async function handleElevenLabsWebhook(req, res) {
             } catch (updateConvIdError) {
               if (isTypeMismatchError(updateConvIdError)) {
                 try {
-                  await db.execute(sql21`UPDATE calls SET elevenlabs_conversation_id = ${conversation_id} WHERE id::text = ${callRecord.id}::text`);
+                  await db.execute(sql16`UPDATE calls SET elevenlabs_conversation_id = ${conversation_id} WHERE id::text = ${callRecord.id}::text`);
                   console.log(`   Updated call record with conversation_id (raw SQL): ${conversation_id}`);
                 } catch (rawUpdateErr) {
                   console.warn(`   \u26A0\uFE0F Failed to set conversation_id (non-fatal):`, rawUpdateErr.message);
@@ -43511,9 +41821,9 @@ async function handleElevenLabsWebhook(req, res) {
                 "queued"
               ]),
               eq22(calls.callDirection, "outgoing"),
-              sql21`${calls.metadata}->>'batchJobId' = ${batchCallId}`
+              sql16`${calls.metadata}->>'batchJobId' = ${batchCallId}`
             )
-          ).orderBy(sql21`${calls.createdAt} DESC`).limit(20);
+          ).orderBy(sql16`${calls.createdAt} DESC`).limit(20);
           console.log(`   Found ${batchCallQuery.length} calls for batch_call_id ${batchCallId}`);
           if (batchCallQuery.length > 0) {
             if (webhookPhone) {
@@ -43537,7 +41847,7 @@ async function handleElevenLabsWebhook(req, res) {
             } catch (updateConvIdError) {
               if (isTypeMismatchError(updateConvIdError)) {
                 try {
-                  await db.execute(sql21`UPDATE calls SET elevenlabs_conversation_id = ${conversation_id} WHERE id::text = ${callRecord.id}::text`);
+                  await db.execute(sql16`UPDATE calls SET elevenlabs_conversation_id = ${conversation_id} WHERE id::text = ${callRecord.id}::text`);
                   console.log(`   Updated call record with conversation_id (raw SQL): ${conversation_id}`);
                 } catch (rawUpdateErr) {
                   console.warn(`   \u26A0\uFE0F Failed to set conversation_id (non-fatal):`, rawUpdateErr.message);
@@ -43561,7 +41871,7 @@ async function handleElevenLabsWebhook(req, res) {
           await db.update(flowExecutions).set({
             status: "running",
             startedAt: /* @__PURE__ */ new Date(),
-            metadata: sql21`COALESCE(${flowExecutions.metadata}, '{}'::jsonb) || ${JSON.stringify({ conversationId: conversation_id })}::jsonb`
+            metadata: sql16`COALESCE(${flowExecutions.metadata}, '{}'::jsonb) || ${JSON.stringify({ conversationId: conversation_id })}::jsonb`
           }).where(eq22(flowExecutions.id, flowExecution.id));
           console.log(`\u{1F500} [ElevenLabs Webhook] Flow execution ${flowExecution.id} started (pending -> running)`);
         }
@@ -43582,7 +41892,7 @@ async function handleElevenLabsWebhook(req, res) {
               const direction = metadata?.phone_call?.direction || "inbound";
               const callDuration = metadata?.call_duration_secs || 0;
               console.log(`   SIP Call - Direction: ${direction}, From: ${callerPhoneNumber || "N/A"}, To: ${calledNumber || "N/A"}`);
-              const existingSipCallResult = await db.execute(sql21`
+              const existingSipCallResult = await db.execute(sql16`
               SELECT * FROM sip_calls WHERE elevenlabs_conversation_id = ${conversation_id} LIMIT 1
             `);
               const existingSipCall = existingSipCallResult.rows[0];
@@ -43595,7 +41905,7 @@ async function handleElevenLabsWebhook(req, res) {
                 }
                 if (existingSipCall.sip_phone_number_id) {
                   try {
-                    const existingSipPhoneResult = await db.execute(sql21`
+                    const existingSipPhoneResult = await db.execute(sql16`
                     SELECT phone_number FROM sip_phone_numbers WHERE id::text = ${existingSipCall.sip_phone_number_id}::text LIMIT 1
                   `);
                     const existingSipPhone = existingSipPhoneResult.rows[0];
@@ -43637,7 +41947,7 @@ async function handleElevenLabsWebhook(req, res) {
                 const finalStatus2 = isCompletedCall2 ? "completed" : isFailedCall2 ? "failed" : status || "in-progress";
                 const endedAt2 = /* @__PURE__ */ new Date();
                 const startedAt2 = new Date(endedAt2.getTime() - callDuration * 1e3);
-                await db.execute(sql21`
+                await db.execute(sql16`
                 UPDATE sip_calls SET
                   status = ${finalStatus2},
                   duration_seconds = ${callDuration},
@@ -43666,7 +41976,7 @@ async function handleElevenLabsWebhook(req, res) {
                   const creditCheck = await checkUserCreditBalance2(existingSipCall.user_id);
                   if (!creditCheck.hasCredits) {
                     console.error(`\u{1F6AB} [ElevenLabs SIP] User has 0 credits - marking call ${existingSipCall.id} as credit_failed`);
-                    await db.execute(sql21`
+                    await db.execute(sql16`
                     UPDATE sip_calls SET 
                       status = 'credit_failed',
                       metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: "Insufficient credits", creditBalance: 0 })}::jsonb,
@@ -43705,7 +42015,7 @@ async function handleElevenLabsWebhook(req, res) {
                     });
                   } else {
                     console.error(`\u274C [ElevenLabs SIP] Credit deduction failed: ${creditResult.error}`);
-                    await db.execute(sql21`
+                    await db.execute(sql16`
                     UPDATE sip_calls SET 
                       status = 'credit_failed',
                       metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true })}::jsonb,
@@ -43794,7 +42104,7 @@ async function handleElevenLabsWebhook(req, res) {
               const finalStatus = isCompletedCall ? "completed" : isFailedCall ? "failed" : status || "in-progress";
               const endedAt = /* @__PURE__ */ new Date();
               const startedAt = new Date(endedAt.getTime() - callDuration * 1e3);
-              const sipCallResult = await db.execute(sql21`
+              const sipCallResult = await db.execute(sql16`
               INSERT INTO sip_calls (
                 user_id, agent_id, sip_trunk_id, sip_phone_number_id,
                 engine, elevenlabs_conversation_id, from_number, to_number,
@@ -43827,7 +42137,7 @@ async function handleElevenLabsWebhook(req, res) {
                 const creditCheck = await checkUserCreditBalance2(agent.userId);
                 if (!creditCheck.hasCredits) {
                   console.error(`\u{1F6AB} [ElevenLabs SIP] User has 0 credits - marking call ${sipCallRecord.id} as credit_failed`);
-                  await db.execute(sql21`
+                  await db.execute(sql16`
                   UPDATE sip_calls SET 
                     status = 'credit_failed',
                     metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: "Insufficient credits", creditBalance: 0 })}::jsonb,
@@ -43866,7 +42176,7 @@ async function handleElevenLabsWebhook(req, res) {
                   });
                 } else {
                   console.error(`\u274C [ElevenLabs SIP] Credit deduction failed: ${creditResult.error}`);
-                  await db.execute(sql21`
+                  await db.execute(sql16`
                   UPDATE sip_calls SET 
                     status = 'credit_failed',
                     metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true })}::jsonb,
@@ -43901,7 +42211,7 @@ async function handleElevenLabsWebhook(req, res) {
               if (!validFromDigits && !validToDigits) {
                 console.log(`\u{1F4DE} [ElevenLabs SIP Fallback] Skipping - no valid phone numbers (from: ${extractedFromDigits.length} digits, to: ${extractedToDigits.length} digits)`);
               } else {
-                const sipPhoneResult = await db.execute(sql21`
+                const sipPhoneResult = await db.execute(sql16`
               SELECT sp.*, st.user_id as trunk_user_id
               FROM sip_phone_numbers sp
               LEFT JOIN sip_trunks st ON sp.sip_trunk_id = st.id
@@ -43941,7 +42251,7 @@ async function handleElevenLabsWebhook(req, res) {
                     sipFallbackTo = sipFallbackFrom;
                     sipFallbackFrom = temp || matchedSipPhone.phone_number;
                   }
-                  const existingSipCallResult = await db.execute(sql21`
+                  const existingSipCallResult = await db.execute(sql16`
                 SELECT * FROM sip_calls WHERE elevenlabs_conversation_id = ${conversation_id} LIMIT 1
               `);
                   const existingSipCall = existingSipCallResult.rows[0];
@@ -43974,7 +42284,7 @@ async function handleElevenLabsWebhook(req, res) {
                     return res.sendStatus(200);
                   }
                   if (existingSipCall) {
-                    await db.execute(sql21`
+                    await db.execute(sql16`
                   UPDATE sip_calls SET
                     status = ${finalStatus},
                     duration_seconds = ${callDuration},
@@ -44005,7 +42315,7 @@ async function handleElevenLabsWebhook(req, res) {
                       const creditCheck = await checkUserCreditBalance2(userId);
                       if (!creditCheck.hasCredits) {
                         console.error(`\u{1F6AB} [ElevenLabs SIP Fallback] User has 0 credits - marking call ${existingSipCall.id} as credit_failed`);
-                        await db.execute(sql21`
+                        await db.execute(sql16`
                       UPDATE sip_calls SET status = 'credit_failed',
                         metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: "Insufficient credits", creditBalance: 0 })}::jsonb,
                         updated_at = NOW()
@@ -44037,7 +42347,7 @@ async function handleElevenLabsWebhook(req, res) {
                           }).catch(() => {
                           });
                         } else {
-                          await db.execute(sql21`
+                          await db.execute(sql16`
                         UPDATE sip_calls SET status = 'credit_failed',
                           metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true })}::jsonb,
                           updated_at = NOW()
@@ -44049,7 +42359,7 @@ async function handleElevenLabsWebhook(req, res) {
                       console.log(`\u26A0\uFE0F [ElevenLabs SIP Fallback] Skipping credit deduction due to error: ${JSON.stringify(errorInfo)}`);
                     }
                   } else {
-                    const sipCallResult = await db.execute(sql21`
+                    const sipCallResult = await db.execute(sql16`
                   INSERT INTO sip_calls (
                     user_id, agent_id, sip_trunk_id, sip_phone_number_id,
                     engine, elevenlabs_conversation_id, from_number, to_number,
@@ -44084,7 +42394,7 @@ async function handleElevenLabsWebhook(req, res) {
                       const creditCheck = await checkUserCreditBalance2(userId);
                       if (!creditCheck.hasCredits) {
                         console.error(`\u{1F6AB} [ElevenLabs SIP Fallback] User has 0 credits - marking call ${sipCallRecord.id} as credit_failed`);
-                        await db.execute(sql21`
+                        await db.execute(sql16`
                       UPDATE sip_calls SET status = 'credit_failed',
                         metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: "Insufficient credits", creditBalance: 0 })}::jsonb,
                         updated_at = NOW()
@@ -44116,7 +42426,7 @@ async function handleElevenLabsWebhook(req, res) {
                           }).catch(() => {
                           });
                         } else {
-                          await db.execute(sql21`
+                          await db.execute(sql16`
                         UPDATE sip_calls SET status = 'credit_failed',
                           metadata = COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true })}::jsonb,
                           updated_at = NOW()
@@ -44142,12 +42452,12 @@ async function handleElevenLabsWebhook(req, res) {
               console.log(`   Creating fallback outbound call record for: ${webhookPhoneNumber}`);
               let campaignMatch = null;
               try {
-                const [cm] = await db.select().from(campaigns).where(eq22(campaigns.agentId, agent.id)).orderBy(sql21`${campaigns.startedAt} DESC NULLS LAST`).limit(1);
+                const [cm] = await db.select().from(campaigns).where(eq22(campaigns.agentId, agent.id)).orderBy(sql16`${campaigns.startedAt} DESC NULLS LAST`).limit(1);
                 campaignMatch = cm;
               } catch (campaignLookupErr) {
                 if (isTypeMismatchError(campaignLookupErr)) {
                   console.warn(`[ElevenLabs Webhook] Type mismatch on campaign lookup, retrying with raw SQL`);
-                  const cmResult = await db.execute(sql21`
+                  const cmResult = await db.execute(sql16`
                     SELECT * FROM campaigns WHERE agent_id::text = ${agent.id}::text
                     ORDER BY started_at DESC NULLS LAST LIMIT 1
                   `);
@@ -44198,7 +42508,7 @@ async function handleElevenLabsWebhook(req, res) {
                 if (isTypeMismatchError(insertError)) {
                   console.warn(`[ElevenLabs Webhook] Type mismatch on outbound INSERT, retrying with raw SQL and uuid casting`);
                   const metadataJson = JSON.stringify(outboundCallValues.metadata);
-                  const rawResult = await db.execute(sql21`
+                  const rawResult = await db.execute(sql16`
                     INSERT INTO calls (
                       user_id, campaign_id, contact_id, phone_number, from_number, to_number,
                       status, call_direction, elevenlabs_conversation_id, twilio_sid,
@@ -44295,12 +42605,12 @@ async function handleElevenLabsWebhook(req, res) {
               if (isTypeMismatchError(connLookupError)) {
                 console.warn(`[ElevenLabs Webhook] Type mismatch on connection lookup, retrying with raw SQL and uuid casting`);
                 try {
-                  const connQuery = calledNumber ? sql21`SELECT ic.id, ic.phone_number_id AS "phoneNumberId", ic.user_id AS "userId",
+                  const connQuery = calledNumber ? sql16`SELECT ic.id, ic.phone_number_id AS "phoneNumberId", ic.user_id AS "userId",
                            pn.phone_number AS "phoneNumber", pn.friendly_name AS "friendlyName"
                          FROM incoming_connections ic
                          LEFT JOIN phone_numbers pn ON ic.phone_number_id::text = pn.id::text
                          WHERE ic.agent_id::text = ${agent.id}::text AND pn.phone_number = ${calledNumber}
-                         LIMIT 1` : sql21`SELECT ic.id, ic.phone_number_id AS "phoneNumberId", ic.user_id AS "userId",
+                         LIMIT 1` : sql16`SELECT ic.id, ic.phone_number_id AS "phoneNumberId", ic.user_id AS "userId",
                            pn.phone_number AS "phoneNumber", pn.friendly_name AS "friendlyName"
                          FROM incoming_connections ic
                          LEFT JOIN phone_numbers pn ON ic.phone_number_id::text = pn.id::text
@@ -44381,7 +42691,7 @@ async function handleElevenLabsWebhook(req, res) {
               if (isTypeMismatchError(insertError)) {
                 console.warn(`[ElevenLabs Webhook] Type mismatch on incoming INSERT, retrying with raw SQL and uuid casting`);
                 const metadataJson = JSON.stringify(callValues.metadata);
-                const rawResult = await db.execute(sql21`
+                const rawResult = await db.execute(sql16`
                   INSERT INTO calls (
                     user_id, campaign_id, contact_id, incoming_connection_id, incoming_agent_id,
                     phone_number, from_number, to_number, status, call_direction,
@@ -44454,7 +42764,7 @@ async function handleElevenLabsWebhook(req, res) {
                 failedTo = failedFrom;
                 failedFrom = temp || sipPhoneNumber.phoneNumber;
               }
-              await db.execute(sql21`
+              await db.execute(sql16`
               INSERT INTO sip_calls (
                 user_id, agent_id, sip_trunk_id, sip_phone_number_id,
                 engine, elevenlabs_conversation_id, from_number, to_number,
@@ -44512,7 +42822,7 @@ async function handleElevenLabsWebhook(req, res) {
             if (isTypeMismatchError(failedInsertErr)) {
               console.warn(`[ElevenLabs Webhook] Type mismatch on failed call INSERT, retrying with raw SQL`);
               const metaJson = JSON.stringify(failedCallValues.metadata);
-              const rawResult = await db.execute(sql21`
+              const rawResult = await db.execute(sql16`
               INSERT INTO calls (
                 user_id, campaign_id, contact_id, phone_number, from_number, to_number,
                 status, call_direction, elevenlabs_conversation_id, twilio_sid,
@@ -44631,7 +42941,7 @@ async function handleElevenLabsWebhook(req, res) {
         if (isTypeMismatchError(updateErr)) {
           console.warn(`[ElevenLabs Webhook] Type mismatch on call UPDATE, retrying with raw SQL`);
           const metaJson = JSON.stringify(updates.metadata || {});
-          await db.execute(sql21`
+          await db.execute(sql16`
             UPDATE calls SET
               status = ${updates.status || "completed"},
               ended_at = ${updates.endedAt || /* @__PURE__ */ new Date()},
@@ -44701,22 +43011,22 @@ async function handleElevenLabsWebhook(req, res) {
       try {
         const callPhone = syncedData.phoneNumber || callRecord.phoneNumber;
         if (callPhone && agent_id && callRecord.userId) {
-          const normalizePhone3 = (phone) => {
+          const normalizePhone2 = (phone) => {
             if (!phone) return null;
             const digits = phone.replace(/[^0-9]/g, "");
             if (digits.length < 6) return null;
             return digits.slice(-10);
           };
-          const normalizedCallPhone = normalizePhone3(callPhone);
+          const normalizedCallPhone = normalizePhone2(callPhone);
           const [agentRecord] = await db.select({ id: agents.id }).from(agents).where(eq22(agents.elevenLabsAgentId, agent_id)).limit(1);
           const recentAppointments = await db.select().from(appointments).where(and17(
             eq22(appointments.userId, callRecord.userId),
-            sql21`${appointments.callId} IS NULL`,
-            sql21`${appointments.createdAt} > NOW() - INTERVAL '10 minutes'`
+            sql16`${appointments.callId} IS NULL`,
+            sql16`${appointments.createdAt} > NOW() - INTERVAL '10 minutes'`
           ));
           console.log(`\u{1F4C5} [ElevenLabs Webhook] Checking ${recentAppointments.length} recent appointments for linking to call ${callRecord.id}`);
           for (const appointment of recentAppointments) {
-            const appointmentPhone = normalizePhone3(appointment.contactPhone);
+            const appointmentPhone = normalizePhone2(appointment.contactPhone);
             const phoneMatches = appointmentPhone && normalizedCallPhone && appointmentPhone === normalizedCallPhone;
             const fuzzyPhoneMatch = appointmentPhone && normalizedCallPhone && appointmentPhone.length === 10 && normalizedCallPhone.length === 10 && appointmentPhone.split("").filter((d, i) => d === normalizedCallPhone[i]).length >= 9;
             if (phoneMatches || fuzzyPhoneMatch) {
@@ -44795,7 +43105,7 @@ async function handleElevenLabsWebhook(req, res) {
             console.error(`\u274C [ElevenLabs Webhook] Credit deduction failed for call ${callRecord.id}: ${creditResult.error}`);
             await db.update(calls).set({
               status: "failed",
-              metadata: sql21`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: creditResult.error })}`
+              metadata: sql16`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditDeductionFailed: true, creditError: creditResult.error })}`
             }).where(eq22(calls.id, callRecord.id));
             console.warn(`\u26A0\uFE0F [ElevenLabs Webhook] Call ${callRecord.id} marked as failed due to credit deduction failure`);
             return res.status(200).json({
@@ -45061,7 +43371,7 @@ async function handleAppointmentToolWebhook(req, res) {
     let agent = await db.select({ id: agents.id, userId: agents.userId, flowId: agents.flowId }).from(agents).where(eq22(agents.elevenLabsAgentId, elevenLabsAgentId)).limit(1);
     if (agent.length === 0 && callId) {
       console.log(`\u{1F4C5} [Appointment Webhook] Agent not found by ElevenLabs ID, trying callId fallback...`);
-      const sipCallByCallId = await db.execute(sql21`
+      const sipCallByCallId = await db.execute(sql16`
         SELECT sc.agent_id, a.id as agent_id_verified, a.user_id, a.flow_id, sc.id as call_id
         FROM sip_calls sc
         JOIN agents a ON sc.agent_id = a.id
@@ -45821,7 +44131,7 @@ async function handlePlayAudioToolWebhook(req, res) {
         eq22(sipCalls.engine, "elevenlabs-sip"),
         inArray6(sipCalls.status, ["initiated", "ringing", "in-progress", "connected"])
       )
-    ).orderBy(sql21`${sipCalls.startedAt} DESC`).limit(1);
+    ).orderBy(sql16`${sipCalls.startedAt} DESC`).limit(1);
     if (activeSipCall) {
       const domain2 = getDomain();
       let resolvedUrl = audioUrl;
@@ -45854,7 +44164,7 @@ async function handlePlayAudioToolWebhook(req, res) {
         eq22(campaigns.agentId, dbAgentId),
         eq22(calls.status, "in-progress")
       )
-    ).orderBy(sql21`${calls.createdAt} DESC`).limit(1);
+    ).orderBy(sql16`${calls.createdAt} DESC`).limit(1);
     let callSid = activeCall?.twilioSid || null;
     if (!callSid) {
       const [incomingCall] = await db.select({
@@ -45866,7 +44176,7 @@ async function handlePlayAudioToolWebhook(req, res) {
           eq22(incomingConnections.agentId, dbAgentId),
           eq22(calls.status, "in-progress")
         )
-      ).orderBy(sql21`${calls.createdAt} DESC`).limit(1);
+      ).orderBy(sql16`${calls.createdAt} DESC`).limit(1);
       callSid = incomingCall?.twilioSid || null;
     }
     if (!callSid) {
@@ -45882,7 +44192,7 @@ async function handlePlayAudioToolWebhook(req, res) {
             eq22(calls.status, "in-progress"),
             eq22(calls.userId, userId)
           )
-        ).orderBy(sql21`${calls.createdAt} DESC`).limit(1);
+        ).orderBy(sql16`${calls.createdAt} DESC`).limit(1);
         if (flowTestCall?.twilioSid) {
           callSid = flowTestCall.twilioSid;
           console.log(`[PlayAudio Webhook] Found flow test call: ${callSid}`);
@@ -48079,7 +46389,7 @@ init_twilio();
 init_notification_service();
 init_email_service();
 init_with_retry();
-import { lte as lte7, eq as eq40, sql as sql30, and as and29 } from "drizzle-orm";
+import { lte as lte7, eq as eq40, sql as sql24, and as and29 } from "drizzle-orm";
 var BILLING_CHECK_INTERVAL = 60 * 60 * 1e3;
 async function getPhoneNumberMonthlyCost() {
   const setting = await storage.getGlobalSetting("phone_number_monthly_credits");
@@ -48140,7 +46450,7 @@ async function renewPhoneNumber(phoneNumber, user, monthlyCredits) {
         amount: monthlyCredits,
         description: `Monthly phone number rental: ${phoneNumber.phoneNumber}`
       }).returning();
-      await tx.execute(sql30`
+      await tx.execute(sql24`
         UPDATE users 
         SET credits = COALESCE(credits, 0) - ${monthlyCredits}
         WHERE id = ${user.id}
@@ -48201,7 +46511,7 @@ async function disablePhoneNumber(phoneNumber, user, monthlyCredits) {
         nextBillingDate: null
         // Clear billing date since it's inactive
       }).where(eq40(phoneNumbers.id, phoneNumber.id));
-      await tx.execute(sql30`
+      await tx.execute(sql24`
         UPDATE campaigns 
         SET status = 'paused'
         WHERE phone_number_id = ${phoneNumber.id} AND status = 'active'
@@ -49560,7 +47870,7 @@ function registerBrandingRoutes(router24) {
 init_storage();
 init_admin_auth();
 init_email_service();
-import nodemailer3 from "nodemailer";
+import nodemailer2 from "nodemailer";
 function registerSmtpRoutes(router24) {
   router24.get("/smtp", requireAdminPermission("communications", "email_settings", "read"), async (req, res) => {
     try {
@@ -49619,7 +47929,7 @@ function registerSmtpRoutes(router24) {
         return res.status(400).json({ error: "SMTP settings are not fully configured" });
       }
       const portNum = Number(smtpPort.value);
-      const transporter2 = nodemailer3.createTransport({
+      const transporter = nodemailer2.createTransport({
         host: smtpHost2.value,
         port: portNum,
         secure: portNum === 465 || smtpSecure?.value === true || smtpSecure?.value === "true",
@@ -49632,7 +47942,7 @@ function registerSmtpRoutes(router24) {
         greetingTimeout: 15e3,
         socketTimeout: 15e3
       });
-      await transporter2.sendMail({
+      await transporter.sendMail({
         from: `"${smtpFromName?.value || "Test"}" <${smtpFromEmail?.value || smtpUsername.value}>`,
         to: testEmail,
         subject: "SMTP Test Email",
@@ -50923,7 +49233,7 @@ init_admin_auth();
 init_db();
 init_schema();
 init_elevenlabs_pool();
-import { eq as eq46, desc as desc13, isNotNull as isNotNull11, and as and32, or as or11, isNull as isNull9, sql as sql32 } from "drizzle-orm";
+import { eq as eq46, desc as desc13, isNotNull as isNotNull11, and as and32, or as or11, isNull as isNull9, sql as sql26 } from "drizzle-orm";
 function registerCallsModerationRoutes(router24) {
   router24.get("/calls", requireAdminPermission("call_monitoring", "all_calls", "read"), async (req, res) => {
     try {
@@ -50942,7 +49252,7 @@ function registerCallsModerationRoutes(router24) {
         userName: users.name,
         userEmail: users.email
       }).from(calls).leftJoin(users, eq46(calls.userId, users.id)).orderBy(desc13(calls.createdAt)).limit(pageSize).offset(offset);
-      const totalResult = await db.select({ count: sql32`count(*)` }).from(calls);
+      const totalResult = await db.select({ count: sql26`count(*)` }).from(calls);
       const totalItems = Number(totalResult[0]?.count || 0);
       res.json({
         data: allCalls,
@@ -51273,7 +49583,7 @@ import AdmZip from "adm-zip";
 import archiver from "archiver";
 import { exec as exec2, spawn } from "child_process";
 import { promisify as promisify3 } from "util";
-import { sql as sql33 } from "drizzle-orm";
+import { sql as sql27 } from "drizzle-orm";
 var execAsync2 = promisify3(exec2);
 var BACKUPS_DIR = path7.resolve(process.cwd(), "backups");
 var TEMP_UPDATE_DIR = path7.resolve(process.cwd(), ".update-temp");
@@ -51567,7 +49877,7 @@ var SystemUpdateService = class {
   }
   async getUpdateHistory() {
     try {
-      const result = await db.execute(sql33`
+      const result = await db.execute(sql27`
         SELECT * FROM system_updates ORDER BY created_at DESC LIMIT 50
       `);
       return result.rows;
@@ -52239,7 +50549,7 @@ ${tail}`);
   async applyRetentionPolicy() {
     let deleted = 0;
     try {
-      const result = await db.execute(sql33`
+      const result = await db.execute(sql27`
         SELECT id, backup_path, status
         FROM system_updates
         WHERE status = 'success' AND backup_path IS NOT NULL
@@ -52253,7 +50563,7 @@ ${tail}`);
             fs7.rmSync(row.backup_path, { recursive: true, force: true });
             deleted++;
           }
-          await db.execute(sql33`
+          await db.execute(sql27`
             UPDATE system_updates SET backup_path = NULL WHERE id = ${row.id}
           `);
         } catch (err) {
@@ -52267,7 +50577,7 @@ ${tail}`);
   }
   async recordUpdate(data) {
     try {
-      await db.execute(sql33`
+      await db.execute(sql27`
         CREATE TABLE IF NOT EXISTS system_updates (
           id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
           from_version VARCHAR(50) NOT NULL,
@@ -52281,7 +50591,7 @@ ${tail}`);
           created_at TIMESTAMP DEFAULT NOW()
         )
       `);
-      await db.execute(sql33`
+      await db.execute(sql27`
         INSERT INTO system_updates (from_version, to_version, status, backup_path, release_notes, error_message, performed_by, file_count)
         VALUES (
           ${data.fromVersion},
@@ -52316,7 +50626,7 @@ var cleanupStaleMaintenanceFlag = SystemUpdateService.cleanupStaleMaintenanceFla
 
 // server/routes/admin/system-update-routes.ts
 init_db();
-import { sql as sql34 } from "drizzle-orm";
+import { sql as sql28 } from "drizzle-orm";
 
 // server/middleware/rateLimiter.ts
 init_errors();
@@ -52679,7 +50989,7 @@ function registerSystemUpdateRoutes(router24) {
         const { updateId } = req.params;
         let backupPath = null;
         try {
-          const result = await db.execute(sql34`
+          const result = await db.execute(sql28`
             SELECT backup_path FROM system_updates WHERE id = ${updateId}
           `);
           if (result.rows.length > 0) {
@@ -52711,7 +51021,7 @@ function registerSystemUpdateRoutes(router24) {
         });
         systemUpdateService.rollback(backupPath).then(async () => {
           try {
-            await db.execute(sql34`
+            await db.execute(sql28`
                 UPDATE system_updates SET status = 'rolled_back' WHERE id = ${updateId}
               `);
           } catch {
@@ -52734,7 +51044,7 @@ function registerSystemUpdateRoutes(router24) {
         const { updateId } = req.params;
         let backupPath = null;
         try {
-          const result = await db.execute(sql34`
+          const result = await db.execute(sql28`
             SELECT backup_path FROM system_updates WHERE id = ${updateId}
           `);
           if (result.rows.length > 0) {
@@ -52783,7 +51093,7 @@ function registerSystemUpdateRoutes(router24) {
         const { updateId } = req.params;
         let backupPath = null;
         try {
-          const result = await db.execute(sql34`
+          const result = await db.execute(sql28`
             SELECT backup_path FROM system_updates WHERE id = ${updateId}
           `);
           if (result.rows.length > 0) {
@@ -52799,7 +51109,7 @@ function registerSystemUpdateRoutes(router24) {
           fs8.rmSync(backupPath, { recursive: true, force: true });
         }
         try {
-          await db.execute(sql34`
+          await db.execute(sql28`
             UPDATE system_updates SET backup_path = NULL WHERE id = ${updateId}
           `);
         } catch {
@@ -52837,7 +51147,7 @@ init_schema();
 init_credit_service();
 init_notification_service();
 init_logger();
-import { and as and33, eq as eq47, gte as gte5, isNotNull as isNotNull12, isNull as isNull10, sql as sql35 } from "drizzle-orm";
+import { and as and33, eq as eq47, gte as gte5, isNotNull as isNotNull12, isNull as isNull10, sql as sql29 } from "drizzle-orm";
 var ALL_ENGINES = [
   "elevenlabs-twilio",
   "twilio-openai",
@@ -52868,7 +51178,7 @@ async function fetchUnbilled(engine, opts = {}) {
       and33(
         eq47(
           creditTransactions.reference,
-          sql35`'twilio-openai:' || ${twilioOpenaiCalls.id}`
+          sql29`'twilio-openai:' || ${twilioOpenaiCalls.id}`
         ),
         eq47(creditTransactions.userId, twilioOpenaiCalls.userId)
       )
@@ -52900,7 +51210,7 @@ async function fetchUnbilled(engine, opts = {}) {
       and33(
         eq47(
           creditTransactions.reference,
-          sql35`'plivo-openai:' || ${plivoCalls.id}`
+          sql29`'plivo-openai:' || ${plivoCalls.id}`
         ),
         eq47(creditTransactions.userId, plivoCalls.userId)
       )
@@ -52934,7 +51244,7 @@ async function fetchUnbilled(engine, opts = {}) {
       and33(
         eq47(
           creditTransactions.reference,
-          sql35`'elevenlabs-twilio:' || ${calls.id}`
+          sql29`'elevenlabs-twilio:' || ${calls.id}`
         ),
         eq47(creditTransactions.userId, calls.userId)
       )
@@ -52969,7 +51279,7 @@ async function fetchUnbilled(engine, opts = {}) {
     and33(
       eq47(
         creditTransactions.reference,
-        sql35`${refPrefix} || ${sipCalls.id}`
+        sql29`${refPrefix} || ${sipCalls.id}`
       ),
       eq47(creditTransactions.userId, sipCalls.userId)
     )
@@ -53434,7 +51744,7 @@ var admin_team_access_routes_default = router2;
 // server/routes/public-routes.ts
 init_schema();
 import { Router as Router3 } from "express";
-import { sql as sql39, eq as eq48 } from "drizzle-orm";
+import { sql as sql33, eq as eq48 } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import fs9 from "fs";
 import path9 from "path";
@@ -53442,7 +51752,7 @@ import path9 from "path";
 // server/seed-all.ts
 init_db();
 init_schema();
-import { sql as sql38 } from "drizzle-orm";
+import { sql as sql32 } from "drizzle-orm";
 
 // server/seed-llm-models-data.ts
 var MODELS_SEED_DATA = [
@@ -55119,7 +53429,7 @@ Information to collect:
 // server/seed-global-settings.ts
 init_db();
 init_schema();
-import { sql as sql36 } from "drizzle-orm";
+import { sql as sql30 } from "drizzle-orm";
 var GLOBAL_SETTINGS_SEED_DATA = [
   // ============================================
   // BRANDING & COMPANY SETTINGS
@@ -55464,7 +53774,7 @@ var GLOBAL_SETTINGS_SEED_DATA = [
 // server/seed-seo-settings.ts
 init_db();
 init_schema();
-import { sql as sql37 } from "drizzle-orm";
+import { sql as sql31 } from "drizzle-orm";
 var SEO_SETTINGS_SEED_DATA = [
   // ============================================
   // BASIC META TAGS
@@ -57967,7 +56277,7 @@ async function seedGlobalSettings() {
     return;
   }
   for (const setting of settingsToInsert) {
-    await db.execute(sql38`
+    await db.execute(sql32`
       INSERT INTO global_settings (id, key, value, description, updated_at)
       VALUES (gen_random_uuid(), ${setting.key}, ${JSON.stringify(setting.value)}::jsonb, ${setting.description}, NOW())
       ON CONFLICT (key) DO NOTHING
@@ -57999,7 +56309,7 @@ async function seedSeoSettings() {
     return;
   }
   for (const setting of settingsToInsert) {
-    await db.execute(sql38`
+    await db.execute(sql32`
       INSERT INTO global_settings (id, key, value, description, updated_at)
       VALUES (gen_random_uuid(), ${setting.key}, ${JSON.stringify(setting.value)}::jsonb, ${setting.description}, NOW())
       ON CONFLICT (key) DO NOTHING
@@ -58136,15 +56446,15 @@ function getPermissionsForLevel(level) {
 async function seedPluginTables() {
   console.log("\n\u{1F50C} Seeding Plugin Tables...");
   try {
-    await db.execute(sql38`ALTER TABLE calls ADD COLUMN IF NOT EXISTS agent_id VARCHAR`);
-    await db.execute(sql38`ALTER TABLE calls ADD COLUMN IF NOT EXISTS engine_type TEXT`);
-    await db.execute(sql38`ALTER TABLE calls ADD COLUMN IF NOT EXISTS credits_used INTEGER DEFAULT 0`);
+    await db.execute(sql32`ALTER TABLE calls ADD COLUMN IF NOT EXISTS agent_id VARCHAR`);
+    await db.execute(sql32`ALTER TABLE calls ADD COLUMN IF NOT EXISTS engine_type TEXT`);
+    await db.execute(sql32`ALTER TABLE calls ADD COLUMN IF NOT EXISTS credits_used INTEGER DEFAULT 0`);
   } catch (e) {
   }
   try {
     console.log("   \u{1F4E1} Creating REST API plugin tables...");
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS api_keys (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58169,7 +56479,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS api_audit_logs (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58191,11 +56501,11 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`ALTER TABLE api_audit_logs ADD COLUMN IF NOT EXISTS request_id TEXT`);
+      await db.execute(sql32`ALTER TABLE api_audit_logs ADD COLUMN IF NOT EXISTS request_id TEXT`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS api_rate_limits (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
           api_key_id VARCHAR NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,
@@ -58207,21 +56517,21 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_keys_key_prefix ON api_keys(key_prefix)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_user_id ON api_audit_logs(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_api_key_id ON api_audit_logs(api_key_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_created_at ON api_audit_logs(created_at)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_request_id ON api_audit_logs(request_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_rate_limits_api_key_id ON api_rate_limits(api_key_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_api_rate_limits_window_start ON api_rate_limits(window_start)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_keys_key_prefix ON api_keys(key_prefix)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_user_id ON api_audit_logs(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_api_key_id ON api_audit_logs(api_key_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_created_at ON api_audit_logs(created_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_audit_logs_request_id ON api_audit_logs(request_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_rate_limits_api_key_id ON api_rate_limits(api_key_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_api_rate_limits_window_start ON api_rate_limits(window_start)`);
     } catch (e) {
     }
     console.log("   \u2705 REST API plugin tables created");
     console.log("   \u{1F4DE} Creating SIP Engine plugin tables...");
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS sip_trunks (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58250,7 +56560,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS sip_phone_numbers (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58275,7 +56585,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS sip_calls (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58309,37 +56619,37 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`ALTER TABLE sip_trunks ADD COLUMN IF NOT EXISTS inbound_transport VARCHAR(10) DEFAULT 'udp'`);
-      await db.execute(sql38`ALTER TABLE sip_trunks ADD COLUMN IF NOT EXISTS inbound_port INTEGER DEFAULT 5060`);
+      await db.execute(sql32`ALTER TABLE sip_trunks ADD COLUMN IF NOT EXISTS inbound_transport VARCHAR(10) DEFAULT 'udp'`);
+      await db.execute(sql32`ALTER TABLE sip_trunks ADD COLUMN IF NOT EXISTS inbound_port INTEGER DEFAULT 5060`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`ALTER TABLE sip_phone_numbers ADD COLUMN IF NOT EXISTS trunk_id VARCHAR REFERENCES sip_trunks(id) ON DELETE CASCADE`);
-      await db.execute(sql38`ALTER TABLE sip_phone_numbers ADD COLUMN IF NOT EXISTS external_elevenlabs_phone_id VARCHAR(255)`);
+      await db.execute(sql32`ALTER TABLE sip_phone_numbers ADD COLUMN IF NOT EXISTS trunk_id VARCHAR REFERENCES sip_trunks(id) ON DELETE CASCADE`);
+      await db.execute(sql32`ALTER TABLE sip_phone_numbers ADD COLUMN IF NOT EXISTS external_elevenlabs_phone_id VARCHAR(255)`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sip_enabled BOOLEAN DEFAULT false`);
-      await db.execute(sql38`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_concurrent_sip_calls INTEGER DEFAULT 0`);
-      await db.execute(sql38`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sip_engines_allowed TEXT[] DEFAULT ARRAY['elevenlabs-sip']`);
+      await db.execute(sql32`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sip_enabled BOOLEAN DEFAULT false`);
+      await db.execute(sql32`ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_concurrent_sip_calls INTEGER DEFAULT 0`);
+      await db.execute(sql32`ALTER TABLE plans ADD COLUMN IF NOT EXISTS sip_engines_allowed TEXT[] DEFAULT ARRAY['elevenlabs-sip']`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_trunks_user_id ON sip_trunks(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_trunks_engine ON sip_trunks(engine)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_trunks_provider ON sip_trunks(provider)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_user_id ON sip_phone_numbers(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_trunk_id ON sip_phone_numbers(sip_trunk_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_agent_id ON sip_phone_numbers(agent_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_calls_user_id ON sip_calls(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_calls_campaign_id ON sip_calls(campaign_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_calls_status ON sip_calls(status)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_calls_engine ON sip_calls(engine)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_sip_calls_created_at ON sip_calls(created_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_trunks_user_id ON sip_trunks(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_trunks_engine ON sip_trunks(engine)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_trunks_provider ON sip_trunks(provider)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_user_id ON sip_phone_numbers(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_trunk_id ON sip_phone_numbers(sip_trunk_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_phone_numbers_agent_id ON sip_phone_numbers(agent_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_calls_user_id ON sip_calls(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_calls_campaign_id ON sip_calls(campaign_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_calls_status ON sip_calls(status)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_calls_engine ON sip_calls(engine)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_sip_calls_created_at ON sip_calls(created_at)`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         INSERT INTO global_settings (setting_key, setting_value, category, description)
         VALUES ('openai_sip_project_id', '', 'sip', 'OpenAI Project ID for SIP integration')
         ON CONFLICT (setting_key) DO NOTHING
@@ -58349,7 +56659,7 @@ async function seedPluginTables() {
     console.log("   \u2705 SIP Engine plugin tables created");
     console.log("   \u{1F465} Creating Team Management plugin tables...");
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS teams (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -58364,7 +56674,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS team_roles (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -58381,7 +56691,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS team_members (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -58403,7 +56713,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS team_permissions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           role_id UUID NOT NULL REFERENCES team_roles(id) ON DELETE CASCADE,
@@ -58421,7 +56731,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS team_member_sessions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           member_id UUID NOT NULL REFERENCES team_members(id) ON DELETE CASCADE,
@@ -58438,7 +56748,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS team_activity_logs (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -58454,7 +56764,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_teams (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name VARCHAR(255) NOT NULL DEFAULT 'Admin Team',
@@ -58467,7 +56777,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_team_roles (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           admin_team_id UUID NOT NULL REFERENCES admin_teams(id) ON DELETE CASCADE,
@@ -58484,7 +56794,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_team_members (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           admin_team_id UUID NOT NULL REFERENCES admin_teams(id) ON DELETE CASCADE,
@@ -58506,7 +56816,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_team_permissions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           role_id UUID NOT NULL REFERENCES admin_team_roles(id) ON DELETE CASCADE,
@@ -58524,7 +56834,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_team_sessions (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           member_id UUID NOT NULL REFERENCES admin_team_members(id) ON DELETE CASCADE,
@@ -58541,7 +56851,7 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS admin_team_activity_logs (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           admin_team_id UUID NOT NULL REFERENCES admin_teams(id) ON DELETE CASCADE,
@@ -58557,31 +56867,31 @@ async function seedPluginTables() {
     } catch (e) {
     }
     try {
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_teams_user_id ON teams(user_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_roles_team_id ON team_roles(team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_members_email ON team_members(email)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_members_status ON team_members(status)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_permissions_role_id ON team_permissions(role_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_member_id ON team_member_sessions(member_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_token ON team_member_sessions(token)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_expires_at ON team_member_sessions(expires_at)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_activity_logs_team_id ON team_activity_logs(team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_team_activity_logs_created_at ON team_activity_logs(created_at)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_roles_admin_team_id ON admin_team_roles(admin_team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_members_admin_team_id ON admin_team_members(admin_team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_members_email ON admin_team_members(email)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_members_status ON admin_team_members(status)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_permissions_role_id ON admin_team_permissions(role_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_member_id ON admin_team_sessions(member_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_token ON admin_team_sessions(token)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_expires_at ON admin_team_sessions(expires_at)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_activity_logs_admin_team_id ON admin_team_activity_logs(admin_team_id)`);
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_admin_team_activity_logs_created_at ON admin_team_activity_logs(created_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_teams_user_id ON teams(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_roles_team_id ON team_roles(team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_members_email ON team_members(email)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_members_status ON team_members(status)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_permissions_role_id ON team_permissions(role_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_member_id ON team_member_sessions(member_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_token ON team_member_sessions(token)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_member_sessions_expires_at ON team_member_sessions(expires_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_activity_logs_team_id ON team_activity_logs(team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_team_activity_logs_created_at ON team_activity_logs(created_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_roles_admin_team_id ON admin_team_roles(admin_team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_members_admin_team_id ON admin_team_members(admin_team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_members_email ON admin_team_members(email)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_members_status ON admin_team_members(status)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_permissions_role_id ON admin_team_permissions(role_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_member_id ON admin_team_sessions(member_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_token ON admin_team_sessions(token)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_sessions_expires_at ON admin_team_sessions(expires_at)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_activity_logs_admin_team_id ON admin_team_activity_logs(admin_team_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_admin_team_activity_logs_created_at ON admin_team_activity_logs(created_at)`);
     } catch (e) {
     }
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE OR REPLACE FUNCTION update_team_tables_updated_at()
         RETURNS TRIGGER AS $$
         BEGIN
@@ -58590,27 +56900,27 @@ async function seedPluginTables() {
         END;
         $$ LANGUAGE plpgsql
       `);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_teams_updated_at ON teams`);
-      await db.execute(sql38`CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON teams FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_team_roles_updated_at ON team_roles`);
-      await db.execute(sql38`CREATE TRIGGER update_team_roles_updated_at BEFORE UPDATE ON team_roles FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_team_members_updated_at ON team_members`);
-      await db.execute(sql38`CREATE TRIGGER update_team_members_updated_at BEFORE UPDATE ON team_members FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_team_permissions_updated_at ON team_permissions`);
-      await db.execute(sql38`CREATE TRIGGER update_team_permissions_updated_at BEFORE UPDATE ON team_permissions FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_admin_teams_updated_at ON admin_teams`);
-      await db.execute(sql38`CREATE TRIGGER update_admin_teams_updated_at BEFORE UPDATE ON admin_teams FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_admin_team_roles_updated_at ON admin_team_roles`);
-      await db.execute(sql38`CREATE TRIGGER update_admin_team_roles_updated_at BEFORE UPDATE ON admin_team_roles FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_admin_team_members_updated_at ON admin_team_members`);
-      await db.execute(sql38`CREATE TRIGGER update_admin_team_members_updated_at BEFORE UPDATE ON admin_team_members FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
-      await db.execute(sql38`DROP TRIGGER IF EXISTS update_admin_team_permissions_updated_at ON admin_team_permissions`);
-      await db.execute(sql38`CREATE TRIGGER update_admin_team_permissions_updated_at BEFORE UPDATE ON admin_team_permissions FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_teams_updated_at ON teams`);
+      await db.execute(sql32`CREATE TRIGGER update_teams_updated_at BEFORE UPDATE ON teams FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_team_roles_updated_at ON team_roles`);
+      await db.execute(sql32`CREATE TRIGGER update_team_roles_updated_at BEFORE UPDATE ON team_roles FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_team_members_updated_at ON team_members`);
+      await db.execute(sql32`CREATE TRIGGER update_team_members_updated_at BEFORE UPDATE ON team_members FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_team_permissions_updated_at ON team_permissions`);
+      await db.execute(sql32`CREATE TRIGGER update_team_permissions_updated_at BEFORE UPDATE ON team_permissions FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_admin_teams_updated_at ON admin_teams`);
+      await db.execute(sql32`CREATE TRIGGER update_admin_teams_updated_at BEFORE UPDATE ON admin_teams FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_admin_team_roles_updated_at ON admin_team_roles`);
+      await db.execute(sql32`CREATE TRIGGER update_admin_team_roles_updated_at BEFORE UPDATE ON admin_team_roles FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_admin_team_members_updated_at ON admin_team_members`);
+      await db.execute(sql32`CREATE TRIGGER update_admin_team_members_updated_at BEFORE UPDATE ON admin_team_members FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
+      await db.execute(sql32`DROP TRIGGER IF EXISTS update_admin_team_permissions_updated_at ON admin_team_permissions`);
+      await db.execute(sql32`CREATE TRIGGER update_admin_team_permissions_updated_at BEFORE UPDATE ON admin_team_permissions FOR EACH ROW EXECUTE FUNCTION update_team_tables_updated_at()`);
     } catch (e) {
     }
     console.log("   \u2705 Team Management plugin tables created");
     try {
-      await db.execute(sql38`
+      await db.execute(sql32`
         CREATE TABLE IF NOT EXISTS google_sheets_credentials (
           id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
           user_id VARCHAR NOT NULL UNIQUE,
@@ -58622,21 +56932,21 @@ async function seedPluginTables() {
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         )
       `);
-      const hasOldExpiry = await db.execute(sql38`
+      const hasOldExpiry = await db.execute(sql32`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'google_sheets_credentials' AND column_name = 'expires_at'
       `);
       if (hasOldExpiry.rows.length > 0) {
-        await db.execute(sql38`ALTER TABLE google_sheets_credentials RENAME COLUMN expires_at TO token_expiry`);
+        await db.execute(sql32`ALTER TABLE google_sheets_credentials RENAME COLUMN expires_at TO token_expiry`);
       }
-      const hasOldEmail = await db.execute(sql38`
+      const hasOldEmail = await db.execute(sql32`
         SELECT column_name FROM information_schema.columns
         WHERE table_name = 'google_sheets_credentials' AND column_name = 'email'
       `);
       if (hasOldEmail.rows.length > 0) {
-        await db.execute(sql38`ALTER TABLE google_sheets_credentials RENAME COLUMN email TO connected_email`);
+        await db.execute(sql32`ALTER TABLE google_sheets_credentials RENAME COLUMN email TO connected_email`);
       }
-      await db.execute(sql38`CREATE INDEX IF NOT EXISTS idx_google_sheets_credentials_user_id ON google_sheets_credentials(user_id)`);
+      await db.execute(sql32`CREATE INDEX IF NOT EXISTS idx_google_sheets_credentials_user_id ON google_sheets_credentials(user_id)`);
       console.log("   \u2705 Google Sheets credentials table created/verified");
     } catch (e) {
       console.error("   \u26A0\uFE0F  Google Sheets credentials table error:", e.message?.slice(0, 100));
@@ -58650,7 +56960,7 @@ async function seedPluginTables() {
 async function seedAdminTeamAndRoles() {
   console.log("\n\u{1F465} Seeding Admin Team and Roles...");
   try {
-    const tableCheck = await db.execute(sql38`
+    const tableCheck = await db.execute(sql32`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
         WHERE table_name = 'admin_teams'
@@ -58660,13 +56970,13 @@ async function seedAdminTeamAndRoles() {
       console.log("   \u26A0\uFE0F  Admin teams table not found (team-management plugin not installed). Skipping.");
       return;
     }
-    const existingTeam = await db.execute(sql38`SELECT * FROM admin_teams LIMIT 1`);
+    const existingTeam = await db.execute(sql32`SELECT * FROM admin_teams LIMIT 1`);
     let adminTeamId;
     if (existingTeam.rows.length > 0) {
       adminTeamId = existingTeam.rows[0].id;
       console.log("   \u2713 Admin team already exists");
     } else {
-      const teamResult = await db.execute(sql38`
+      const teamResult = await db.execute(sql32`
         INSERT INTO admin_teams (name, description)
         VALUES ('Admin Team', 'Platform administration team for sub-admins')
         RETURNING id
@@ -58674,7 +56984,7 @@ async function seedAdminTeamAndRoles() {
       adminTeamId = teamResult.rows[0].id;
       console.log("   \u2705 Created admin team");
     }
-    const existingRoles = await db.execute(sql38`
+    const existingRoles = await db.execute(sql32`
       SELECT name FROM admin_team_roles WHERE admin_team_id = ${adminTeamId}
     `);
     const existingRoleNames = existingRoles.rows.map((r) => r.name);
@@ -58684,7 +56994,7 @@ async function seedAdminTeamAndRoles() {
       if (existingRoleNames.includes(role.name)) {
         continue;
       }
-      const roleResult = await db.execute(sql38`
+      const roleResult = await db.execute(sql32`
         INSERT INTO admin_team_roles (admin_team_id, name, display_name, description, is_system, is_default)
         VALUES (${adminTeamId}, ${role.name}, ${role.displayName}, ${role.description}, true, ${role.isDefault})
         RETURNING id
@@ -58694,7 +57004,7 @@ async function seedAdminTeamAndRoles() {
       const perms = getPermissionsForLevel(role.permissionLevel);
       for (const section of ADMIN_PERMISSION_SECTIONS) {
         for (const subsection of section.subsections) {
-          await db.execute(sql38`
+          await db.execute(sql32`
             INSERT INTO admin_team_permissions (role_id, section, subsection, can_create, can_read, can_update, can_delete)
             VALUES (${roleId}, ${section.id}, ${subsection.id}, ${perms.canCreate}, ${perms.canRead}, ${perms.canUpdate}, ${perms.canDelete})
             ON CONFLICT (role_id, section, subsection) DO NOTHING
@@ -58715,12 +57025,12 @@ async function seedAdminTeamAndRoles() {
 }
 async function updateSeedVersion() {
   console.log("\n\u{1F4CC} Updating seed version tracking...");
-  await db.execute(sql38`
+  await db.execute(sql32`
     UPDATE global_settings 
     SET value = ${JSON.stringify(SEED_VERSION)}::jsonb, updated_at = NOW()
     WHERE key = 'seed_version'
   `);
-  await db.execute(sql38`
+  await db.execute(sql32`
     UPDATE global_settings 
     SET value = ${JSON.stringify((/* @__PURE__ */ new Date()).toISOString())}::jsonb, updated_at = NOW()
     WHERE key = 'seed_applied_at'
@@ -58838,7 +57148,7 @@ function createPublicRoutes(ctx) {
   const { db: db2, storage: storage4, authenticateToken: authenticateToken2, requireRole: requireRole2, emailService: emailService2 } = ctx;
   async function isInstalled() {
     try {
-      const userCount = await db2.select({ count: sql39`count(*)::int` }).from(users);
+      const userCount = await db2.select({ count: sql33`count(*)::int` }).from(users);
       return userCount[0]?.count > 0;
     } catch {
       return false;
@@ -58920,7 +57230,7 @@ function createPublicRoutes(ctx) {
         message: majorVersion >= 18 ? `Node.js ${nodeVersion} (Required: 18+)` : `Node.js ${nodeVersion} is too old. Upgrade to 18+`
       });
       try {
-        await db2.execute(sql39`SELECT 1`);
+        await db2.execute(sql33`SELECT 1`);
         checks.push({
           name: "Database Connection",
           status: "success",
@@ -59010,7 +57320,7 @@ function createPublicRoutes(ctx) {
       ];
       for (const setting of settingsToCreate) {
         try {
-          await db2.execute(sql39`
+          await db2.execute(sql33`
             INSERT INTO global_settings (key, value, description, updated_at)
             VALUES (${setting.key}, ${JSON.stringify(setting.value)}::jsonb, ${setting.description}, NOW())
             ON CONFLICT (key) DO UPDATE 
@@ -63013,11 +61323,11 @@ init_rag_elevenlabs_tool();
 async function fetchWhatsappTemplateNames(userId) {
   try {
     const { importPlugin: importPlugin2 } = await Promise.resolve().then(() => (init_plugin_import(), plugin_import_exports));
-    const { metaWhatsAppService: metaWhatsAppService2, whatswayService: whatswayService2 } = await importPlugin2("plugins/messaging/index.ts");
+    const { metaWhatsAppService, whatswayService } = await importPlugin2("plugins/messaging/index.ts");
     try {
-      const metaSettings = await metaWhatsAppService2.getSettings(userId);
+      const metaSettings = await metaWhatsAppService.getSettings(userId);
       if (metaSettings && metaSettings.isActive) {
-        const templates = await metaWhatsAppService2.getTemplates(userId);
+        const templates = await metaWhatsAppService.getTemplates(userId);
         const names = templates.map((t) => t.name);
         console.log(`\u{1F4CB} [WhatsApp Templates] Fetched ${names.length} Meta template(s) for user ${userId}`);
         return names;
@@ -63026,9 +61336,9 @@ async function fetchWhatsappTemplateNames(userId) {
       console.log(`\u26A0\uFE0F  [WhatsApp Templates] Meta fetch failed: ${metaErr.message}`);
     }
     try {
-      const wwSettings = await whatswayService2.getSettings(userId);
+      const wwSettings = await whatswayService.getSettings(userId);
       if (wwSettings && wwSettings.isActive) {
-        const templates = await whatswayService2.getTemplates(userId);
+        const templates = await whatswayService.getTemplates(userId);
         const names = templates.map((t) => t.name);
         console.log(`\u{1F4CB} [WhatsApp Templates] Fetched ${names.length} WhatsWay template(s) for user ${userId}`);
         return names;
@@ -65562,7 +63872,7 @@ function createCampaignRoutes(ctx) {
 // server/routes/phone-routes.ts
 init_schema();
 import { Router as Router7 } from "express";
-import { eq as eq57, and as and39, isNull as isNull12, sql as sql42 } from "drizzle-orm";
+import { eq as eq57, and as and39, isNull as isNull12, sql as sql36 } from "drizzle-orm";
 function createPhoneRoutes(ctx) {
   const router24 = Router7();
   const { db: db2, storage: storage4, authenticateToken: authenticateToken2, authenticateHybrid: authenticateHybrid2, requireRole: requireRole2, checkActiveMembership: checkActiveMembership3, twilioService: twilioService2 } = ctx;
@@ -65706,7 +64016,7 @@ function createPhoneRoutes(ctx) {
         }
       }
       const effectiveLimits = await storage4.getUserEffectiveLimits(req.userId);
-      const currentPhoneCount = await db2.select({ count: sql42`count(*)` }).from(phoneNumbers).where(eq57(phoneNumbers.userId, req.userId));
+      const currentPhoneCount = await db2.select({ count: sql36`count(*)` }).from(phoneNumbers).where(eq57(phoneNumbers.userId, req.userId));
       const phoneCount = Number(currentPhoneCount[0]?.count || 0);
       const maxPhoneNumbers = typeof effectiveLimits.maxPhoneNumbers === "number" ? effectiveLimits.maxPhoneNumbers : 0;
       if (maxPhoneNumbers !== 999 && maxPhoneNumbers !== -1 && phoneCount >= maxPhoneNumbers) {
@@ -65900,7 +64210,7 @@ function createPhoneRoutes(ctx) {
               amount: monthlyCredits,
               description: `Phone number rental: ${twilioNumber.phoneNumber}`
             });
-            await tx.execute(sql42`
+            await tx.execute(sql36`
               UPDATE users 
               SET credits = COALESCE(credits, 0) - ${monthlyCredits}
               WHERE id = ${req.userId}
@@ -66016,7 +64326,7 @@ function createPhoneRoutes(ctx) {
                   amount: monthlyCredits,
                   description: `Refund: Phone number purchase rollback (${twilioNumber.phoneNumber})`
                 });
-                await tx.execute(sql42`
+                await tx.execute(sql36`
                   UPDATE users 
                   SET credits = COALESCE(credits, 0) + ${monthlyCredits}
                   WHERE id = ${req.userId}
@@ -68677,7 +66987,7 @@ import { eq as eq61, and as and42 } from "drizzle-orm";
 // server/modules/widget/widget-storage.ts
 init_db();
 init_schema();
-import { eq as eq60, and as and41, desc as desc15, sql as sql43 } from "drizzle-orm";
+import { eq as eq60, and as and41, desc as desc15, sql as sql37 } from "drizzle-orm";
 var WidgetStorage = class {
   async createWidget(data) {
     const [widget] = await db.insert(websiteWidgets).values(data).returning();
@@ -68704,8 +67014,8 @@ var WidgetStorage = class {
   }
   async incrementWidgetStats(widgetId, durationMinutes) {
     await db.update(websiteWidgets).set({
-      totalCalls: sql43`${websiteWidgets.totalCalls} + 1`,
-      totalMinutes: sql43`${websiteWidgets.totalMinutes} + ${durationMinutes}`,
+      totalCalls: sql37`${websiteWidgets.totalCalls} + 1`,
+      totalMinutes: sql37`${websiteWidgets.totalMinutes} + ${durationMinutes}`,
       updatedAt: /* @__PURE__ */ new Date()
     }).where(eq60(websiteWidgets.id, widgetId));
   }
@@ -68728,7 +67038,7 @@ var WidgetStorage = class {
   async getActiveSessionsForWidget(widgetId) {
     return db.select().from(widgetCallSessions).where(and41(
       eq60(widgetCallSessions.widgetId, widgetId),
-      sql43`${widgetCallSessions.status} IN ('active', 'pending', 'connecting')`
+      sql37`${widgetCallSessions.status} IN ('active', 'pending', 'connecting')`
     ));
   }
   async getActiveSessionCount(widgetId) {
@@ -76941,7 +75251,11 @@ var AudioBridgeService = class _AudioBridgeService {
     };
     if (agentConfig.tools) {
       for (const tool of agentConfig.tools) {
-        session.toolHandlers.set(tool.name, tool.handler);
+        if (tool.handler) {
+          session.toolHandlers.set(tool.name, tool.handler);
+        } else {
+          logger.warn(`Tool "${tool.name}" has no handler \u2014 will not be dispatchable`, void 0, "AudioBridge");
+        }
       }
     }
     this.activeSessions.set(callUuid, session);
@@ -77069,24 +75383,22 @@ ERROR HANDLING \u2014 MANDATORY:
     const sessionConfig = {
       type: "session.update",
       session: {
-        type: "realtime",
+        modalities: ["text", "audio"],
         instructions: enhancedInstructions,
-        audio: {
-          input: {
-            format: { type: "audio/pcm", rate: 24e3 },
-            transcription: { model: "whisper-1" },
-            turn_detection: turnDetection
-          },
-          output: {
-            format: { type: "audio/pcm", rate: 24e3 },
-            voice: agentConfig.voice
-          }
-        },
+        voice: agentConfig.voice,
+        input_audio_format: "pcm16",
+        output_audio_format: "pcm16",
+        input_audio_transcription: { model: "whisper-1" },
+        turn_detection: turnDetection,
         tools: tools2,
-        tool_choice: tools2.length > 0 ? "auto" : "none"
+        tool_choice: tools2.length > 0 ? "auto" : "none",
+        temperature: agentConfig.temperature ?? 0.7
       }
     };
-    logger.info(`Configuring session with ${tools2.length} tools`, void 0, "AudioBridge");
+    logger.info(`Configuring session with ${tools2.length} tools, VAD=${vadType}`, void 0, "AudioBridge");
+    if (tools2.length > 0) {
+      logger.info(`Tools configured: ${tools2.map((t) => t.name || t.function?.name).join(", ")}`, void 0, "AudioBridge");
+    }
     openaiWs.send(JSON.stringify(sessionConfig));
     if (agentConfig.firstMessage) {
       logger.info(`First message configured, will send when Plivo stream is ready for ${session.callUuid}`, void 0, "AudioBridge");
@@ -77929,8 +76241,8 @@ ERROR HANDLING \u2014 MANDATORY:
         autoVars.contact_name = params.contact_name;
       }
       const mergedVariables = { ...autoVars, ...dynamicVariables };
-      const { emailTemplateService: emailTemplateService2 } = await Promise.resolve().then(() => (init_email_template_service(), email_template_service_exports));
-      const result = await emailTemplateService2.sendEmailByName(
+      const { emailTemplateService } = await import("../../../../plugins/messaging/services/email-template.service");
+      const result = await emailTemplateService.sendEmailByName(
         ctx.userId,
         templateName,
         recipientEmail,
@@ -78000,15 +76312,15 @@ ERROR HANDLING \u2014 MANDATORY:
       components = [{ type: "body", parameters }];
     }
     try {
-      const { metaWhatsAppService: metaWhatsAppService2, MetaWhatsAppService: MetaWhatsAppService2 } = await Promise.resolve().then(() => (init_meta_whatsapp_service(), meta_whatsapp_service_exports));
-      const { whatswayService: whatswayService2 } = await Promise.resolve().then(() => (init_whatsway_service(), whatsway_service_exports));
-      const metaSettings = await metaWhatsAppService2.getSettings(ctx.userId);
-      const whatswaySettings = await whatswayService2.getSettings(ctx.userId);
+      const { metaWhatsAppService, MetaWhatsAppService } = await import("../../../../plugins/messaging/services/meta-whatsapp.service");
+      const { whatswayService } = await import("../../../../plugins/messaging/services/whatsway.service");
+      const metaSettings = await metaWhatsAppService.getSettings(ctx.userId);
+      const whatswaySettings = await whatswayService.getSettings(ctx.userId);
       if (metaSettings?.isActive) {
         try {
-          const templateDef = await metaWhatsAppService2.getTemplateByName(ctx.userId, templateName);
+          const templateDef = await metaWhatsAppService.getTemplateByName(ctx.userId, templateName);
           if (templateDef && templateDef.components) {
-            const buttonComponents = MetaWhatsAppService2.buildButtonComponents(templateDef.components, ctx.fixedButtonVariables);
+            const buttonComponents = MetaWhatsAppService.buildButtonComponents(templateDef.components, ctx.fixedButtonVariables);
             if (buttonComponents.length > 0) {
               components = [...components, ...buttonComponents];
               logger.info(`[send_whatsapp] Auto-added ${buttonComponents.length} button component(s) for template "${templateName}"`, void 0, "AudioBridge");
@@ -78020,7 +76332,7 @@ ERROR HANDLING \u2014 MANDATORY:
       }
       let sendResult;
       if (metaSettings?.isActive) {
-        sendResult = await metaWhatsAppService2.sendTemplate(
+        sendResult = await metaWhatsAppService.sendTemplate(
           ctx.userId,
           recipientPhone,
           templateName,
@@ -78029,7 +76341,7 @@ ERROR HANDLING \u2014 MANDATORY:
           { callId: ctx.callId, agentId: ctx.agentId }
         );
       } else if (whatswaySettings?.isActive) {
-        sendResult = await whatswayService2.sendTemplate(
+        sendResult = await whatswayService.sendTemplate(
           ctx.userId,
           recipientPhone,
           templateName,
@@ -78041,9 +76353,9 @@ ERROR HANDLING \u2014 MANDATORY:
         return { success: false, message: "No WhatsApp provider configured." };
       }
       try {
-        const { whatsAppConversationService: whatsAppConversationService2 } = await Promise.resolve().then(() => (init_whatsapp_conversation_service(), whatsapp_conversation_service_exports));
-        const conversation = await whatsAppConversationService2.getOrCreateConversation(ctx.userId, recipientPhone);
-        await whatsAppConversationService2.addMessage({
+        const { whatsAppConversationService } = await import("../../../../plugins/messaging/services/whatsapp-conversation.service");
+        const conversation = await whatsAppConversationService.getOrCreateConversation(ctx.userId, recipientPhone);
+        await whatsAppConversationService.addMessage({
           conversationId: conversation.id,
           userId: ctx.userId,
           direction: "outbound",
@@ -79613,7 +77925,7 @@ init_schema();
 init_credit_service();
 init_logger();
 init_elevenlabs_pool();
-import { eq as eq69, sql as sql45 } from "drizzle-orm";
+import { eq as eq69, sql as sql39 } from "drizzle-orm";
 function setupPlivoElevenLabsWebhooks(app2, baseUrl) {
   app2.post("/api/plivo-elevenlabs/voice/answer", async (req, res) => {
     try {
@@ -79645,7 +77957,7 @@ function setupPlivoElevenLabsWebhooks(app2, baseUrl) {
             plivoCallUuid: CallUUID,
             status: "in-progress",
             answeredAt: /* @__PURE__ */ new Date()
-          }).where(sql45`${plivoCalls.metadata}->>'internalId' = ${callId} AND ${plivoCalls.metadata}->>'engine' = 'plivo-elevenlabs'`);
+          }).where(sql39`${plivoCalls.metadata}->>'internalId' = ${callId} AND ${plivoCalls.metadata}->>'engine' = 'plivo-elevenlabs'`);
         } catch (updErr) {
           logger.warn(
             `Failed to attach CallUUID ${CallUUID} to outbound call ${callId}: ${updErr?.message || updErr}`,
@@ -79723,7 +78035,7 @@ function setupPlivoElevenLabsWebhooks(app2, baseUrl) {
                     );
                     await db.update(plivoCalls).set({
                       status: "credit_failed",
-                      metadata: sql45`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({
+                      metadata: sql39`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({
                         creditDeductionFailed: true,
                         creditError: creditResult.error || "Insufficient credits",
                         creditsRequired: creditsToDeduct,
@@ -80025,7 +78337,7 @@ init_audio_bridge_service();
 init_logger();
 init_webhook_delivery();
 import { Router as Router16 } from "express";
-import { eq as eq70, sql as sql46 } from "drizzle-orm";
+import { eq as eq70, sql as sql40 } from "drizzle-orm";
 import { nanoid as nanoid8 } from "nanoid";
 var router8 = Router16();
 router8.use("/voice/*", validateTwilioWebhook);
@@ -80384,7 +78696,7 @@ router8.post("/voice/status", async (req, res) => {
                 "TwilioOpenAI"
               );
               updates.status = "credit_failed";
-              updates.metadata = sql46`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditError: creditResult.error, creditsRequired: creditsToDeduct })}::jsonb`;
+              updates.metadata = sql40`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditError: creditResult.error, creditsRequired: creditsToDeduct })}::jsonb`;
             }
           } catch (creditErr) {
             logger.error(
@@ -80559,7 +78871,7 @@ init_twilio_openai_config();
 init_twilio_connector();
 init_call_insights_service();
 import { WebSocketServer as WebSocketServer3 } from "ws";
-import { eq as eq71, sql as sql47, and as and49, desc as desc18 } from "drizzle-orm";
+import { eq as eq71, sql as sql41, and as and49, desc as desc18 } from "drizzle-orm";
 var sharedWss = null;
 function setupTwilioOpenAIStreamHandler(httpServer2) {
   if (!sharedWss) {
@@ -80966,7 +79278,7 @@ async function initializeSession2(callSid, twilioWs, streamSid) {
               try {
                 await db.update(twilioOpenaiCalls).set({
                   status: "credit_failed",
-                  metadata: sql47`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditError: creditResult.error, creditsRequired: creditsToDeduct })}::jsonb`
+                  metadata: sql41`COALESCE(metadata, '{}'::jsonb) || ${JSON.stringify({ creditError: creditResult.error, creditsRequired: creditsToDeduct })}::jsonb`
                 }).where(eq71(twilioOpenaiCalls.id, callId));
                 logger.warn(`Call ${callId} marked as credit_failed - insufficient credits (required: ${creditsToDeduct})`, void 0, "TwilioOpenAI Stream");
               } catch (updateError) {
@@ -81483,7 +79795,7 @@ init_schema();
 init_webhook_delivery();
 init_google_calendar_service();
 import { Router as Router18 } from "express";
-import { eq as eq73, and as and51, gte as gte7, lte as lte8, desc as desc19, sql as sql48, inArray as inArray16, isNull as isNull15 } from "drizzle-orm";
+import { eq as eq73, and as and51, gte as gte7, lte as lte8, desc as desc19, sql as sql42, inArray as inArray16, isNull as isNull15 } from "drizzle-orm";
 import { nanoid as nanoid9 } from "nanoid";
 init_storage();
 init_elevenlabs();
@@ -81597,7 +79909,7 @@ router10.post("/flows", async (req, res) => {
     }
     const userId = req.userId;
     const effectiveLimits = await storage.getUserEffectiveLimits(userId);
-    const currentFlowCount = await db.select({ count: sql48`count(*)` }).from(flows).where(eq73(flows.userId, userId));
+    const currentFlowCount = await db.select({ count: sql42`count(*)` }).from(flows).where(eq73(flows.userId, userId));
     const flowCount = Number(currentFlowCount[0]?.count || 0);
     const maxFlows = typeof effectiveLimits.maxFlows === "number" ? effectiveLimits.maxFlows : 3;
     if (maxFlows !== 999 && maxFlows !== -1 && flowCount >= maxFlows) {
@@ -82348,7 +80660,7 @@ async function placeFlowTestCall({
               toPhone: phoneNumber,
               status: "waiting"
             }).returning();
-            const [{ count: count2 }] = await db.select({ count: sql48`count(*)::int` }).from(flowTestQueue).where(eq73(flowTestQueue.status, "waiting"));
+            const [{ count: count2 }] = await db.select({ count: sql42`count(*)::int` }).from(flowTestQueue).where(eq73(flowTestQueue.status, "waiting"));
             console.log(`\u23F3 [Flow Test] All pool numbers busy, queued as entry ${queueEntry.id} (position ${count2})`);
             throw new FlowTestHttpError(202, {
               queued: true,
@@ -82414,7 +80726,7 @@ async function placeFlowTestCall({
               toPhone: phoneNumber,
               status: "waiting"
             }).returning();
-            const [{ count: count2 }] = await db.select({ count: sql48`count(*)::int` }).from(flowTestQueue).where(eq73(flowTestQueue.status, "waiting"));
+            const [{ count: count2 }] = await db.select({ count: sql42`count(*)::int` }).from(flowTestQueue).where(eq73(flowTestQueue.status, "waiting"));
             console.log(`\u23F3 [Flow Test] All pool numbers busy, queued as entry ${queueEntry.id} (position ${count2})`);
             throw new FlowTestHttpError(202, {
               queued: true,
@@ -83013,8 +81325,8 @@ async function placeFlowTestCall({
       callSid = result.callSid || void 0;
       if (conversationId && callId) {
         try {
-          const { sql: sql58 } = await import("drizzle-orm");
-          await db.execute(sql58`
+          const { sql: sql52 } = await import("drizzle-orm");
+          await db.execute(sql52`
             UPDATE calls 
             SET elevenlabs_conversation_id = ${conversationId},
                 twilio_sid = ${callSid || null}
@@ -83157,7 +81469,7 @@ router10.get("/queue/:entryId", async (req, res) => {
     const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1e3);
     await db.update(flowTestQueue).set({ status: "failed", errorMessage: "Queue timeout: abandoned (15 minutes)." }).where(and51(
       eq73(flowTestQueue.status, "waiting"),
-      sql48`${flowTestQueue.createdAt} < ${fifteenMinsAgo}`
+      sql42`${flowTestQueue.createdAt} < ${fifteenMinsAgo}`
     ));
     if (entry.createdAt < fifteenMinsAgo) {
       return res.json({
@@ -83167,9 +81479,9 @@ router10.get("/queue/:entryId", async (req, res) => {
         errorMessage: "Queue timeout exceeded (15 minutes). Please try again."
       });
     }
-    const [{ count: ahead }] = await db.select({ count: sql48`count(*)::int` }).from(flowTestQueue).where(and51(
+    const [{ count: ahead }] = await db.select({ count: sql42`count(*)::int` }).from(flowTestQueue).where(and51(
       eq73(flowTestQueue.status, "waiting"),
-      sql48`${flowTestQueue.createdAt} < ${entry.createdAt}`
+      sql42`${flowTestQueue.createdAt} < ${entry.createdAt}`
     ));
     const position = (ahead ?? 0) + 1;
     if (position > 1) {
@@ -83259,7 +81571,7 @@ router10.post("/flow-templates/:templateId/clone", async (req, res) => {
     const { templateId } = req.params;
     const { name } = req.body;
     const effectiveLimits = await storage.getUserEffectiveLimits(userId);
-    const currentFlowCount = await db.select({ count: sql48`count(*)` }).from(flows).where(eq73(flows.userId, userId));
+    const currentFlowCount = await db.select({ count: sql42`count(*)` }).from(flows).where(eq73(flows.userId, userId));
     const flowCount = Number(currentFlowCount[0]?.count || 0);
     const maxFlows = typeof effectiveLimits.maxFlows === "number" ? effectiveLimits.maxFlows : 3;
     if (maxFlows !== 999 && maxFlows !== -1 && flowCount >= maxFlows) {
@@ -83302,7 +81614,7 @@ router10.post("/flows/:id/clone", async (req, res) => {
     const userId = req.userId;
     const { id } = req.params;
     const effectiveLimits = await storage.getUserEffectiveLimits(userId);
-    const currentFlowCount = await db.select({ count: sql48`count(*)` }).from(flows).where(eq73(flows.userId, userId));
+    const currentFlowCount = await db.select({ count: sql42`count(*)` }).from(flows).where(eq73(flows.userId, userId));
     const flowCount = Number(currentFlowCount[0]?.count || 0);
     const maxFlows = typeof effectiveLimits.maxFlows === "number" ? effectiveLimits.maxFlows : 3;
     if (maxFlows !== 999 && maxFlows !== -1 && flowCount >= maxFlows) {
@@ -83315,7 +81627,7 @@ router10.post("/flows/:id/clone", async (req, res) => {
     }
     const [originalFlow] = await db.select().from(flows).where(and51(
       eq73(flows.id, id),
-      sql48`(${flows.userId} = ${userId} OR ${flows.isTemplate} = true)`
+      sql42`(${flows.userId} = ${userId} OR ${flows.isTemplate} = true)`
     ));
     if (!originalFlow) {
       return res.status(404).json({ error: "Flow not found" });
@@ -83977,7 +82289,7 @@ router10.get("/forms", async (req, res) => {
     const formsWithFieldsAndCount = await Promise.all(
       userForms.map(async (form) => {
         const fields = await db.select().from(formFields).where(eq73(formFields.formId, form.id)).orderBy(formFields.order);
-        const [submissionResult] = await db.select({ count: sql48`count(*)` }).from(formSubmissions).where(eq73(formSubmissions.formId, form.id));
+        const [submissionResult] = await db.select({ count: sql42`count(*)` }).from(formSubmissions).where(eq73(formSubmissions.formId, form.id));
         return {
           ...form,
           fields,
@@ -86909,7 +85221,7 @@ router17.post("/save-smtp", requireAdminPermission("communications", "email_sett
       fromEmail: z8.string().email().optional(),
       fromName: z8.string().optional()
     });
-    const { host, port, username, password, fromEmail, fromName: fromName2 } = smtpSchema.parse(req.body);
+    const { host, port, username, password, fromEmail, fromName } = smtpSchema.parse(req.body);
     await storage.updateGlobalSetting("smtp_host", host);
     await storage.updateGlobalSetting("smtp_port", port);
     await storage.updateGlobalSetting("smtp_username", username);
@@ -86917,8 +85229,8 @@ router17.post("/save-smtp", requireAdminPermission("communications", "email_sett
     if (fromEmail) {
       await storage.updateGlobalSetting("smtp_from_email", fromEmail);
     }
-    if (fromName2) {
-      await storage.updateGlobalSetting("smtp_from_name", fromName2);
+    if (fromName) {
+      await storage.updateGlobalSetting("smtp_from_name", fromName);
     }
     const reinitialized = await emailService.reinitializeFromDatabase();
     res.json({
@@ -89120,7 +87432,7 @@ var crm_routes_default = router19;
 // server/modules/widget/widget-service.ts
 init_db();
 import { nanoid as nanoid10 } from "nanoid";
-import { sql as sql49 } from "drizzle-orm";
+import { sql as sql43 } from "drizzle-orm";
 var WidgetService = class {
   generateEmbedToken() {
     return `wgt_${nanoid10(24)}`;
@@ -89214,7 +87526,7 @@ var WidgetService = class {
     const maxDurationMinutes = widget.maxCallDuration ? Math.ceil(widget.maxCallDuration / 60) : 30;
     const staleThresholdMs = (maxDurationMinutes + 5) * 60 * 1e3;
     const cutoffTime = new Date(Date.now() - staleThresholdMs);
-    const result = await db.execute(sql49`
+    const result = await db.execute(sql43`
       UPDATE widget_call_sessions 
       SET status = 'completed', 
           ended_at = NOW()
@@ -89639,7 +87951,7 @@ init_storage();
 init_call_insights_service();
 init_rag_knowledge();
 import { nanoid as nanoid11 } from "nanoid";
-import { eq as eq81, sql as sql50, and as and54 } from "drizzle-orm";
+import { eq as eq81, sql as sql44, and as and54 } from "drizzle-orm";
 var router21 = Router35();
 router21.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -89878,12 +88190,12 @@ router21.get("/widget/config/:token", async (req, res) => {
               )).returning({ id: agents.id });
               if (updateResult.length > 0) {
                 await tx.update(elevenLabsCredentials).set({
-                  totalAssignedAgents: sql50`${elevenLabsCredentials.totalAssignedAgents} + 1`,
+                  totalAssignedAgents: sql44`${elevenLabsCredentials.totalAssignedAgents} + 1`,
                   updatedAt: /* @__PURE__ */ new Date()
                 }).where(eq81(elevenLabsCredentials.id, fallbackCredential.id));
                 if (oldCredentialId && oldCredentialId !== fallbackCredential.id) {
                   await tx.update(elevenLabsCredentials).set({
-                    totalAssignedAgents: sql50`GREATEST(0, ${elevenLabsCredentials.totalAssignedAgents} - 1)`,
+                    totalAssignedAgents: sql44`GREATEST(0, ${elevenLabsCredentials.totalAssignedAgents} - 1)`,
                     updatedAt: /* @__PURE__ */ new Date()
                   }).where(eq81(elevenLabsCredentials.id, oldCredentialId));
                 }
@@ -89921,12 +88233,12 @@ router21.get("/widget/config/:token", async (req, res) => {
             credentialName = credential.name;
             const updateResult = await tx.update(agents).set({ elevenLabsCredentialId: credential.id }).where(and54(
               eq81(agents.id, currentAgent.id),
-              sql50`${agents.elevenLabsCredentialId} IS NULL`
+              sql44`${agents.elevenLabsCredentialId} IS NULL`
               // Only update if still unassigned
             )).returning({ id: agents.id });
             if (updateResult.length > 0) {
               await tx.update(elevenLabsCredentials).set({
-                totalAssignedAgents: sql50`${elevenLabsCredentials.totalAssignedAgents} + 1`,
+                totalAssignedAgents: sql44`${elevenLabsCredentials.totalAssignedAgents} + 1`,
                 updatedAt: /* @__PURE__ */ new Date()
               }).where(eq81(elevenLabsCredentials.id, credential.id));
               console.log(`[Widget Config] Assigned agent ${currentAgent.name} to credential ${credential.name}`);
@@ -90112,7 +88424,7 @@ router21.post("/widget/session/:sessionId/end", async (req, res) => {
     const durationSeconds = duration || 0;
     const durationMinutes = Math.ceil(durationSeconds / 60);
     const creditsUsed = durationMinutes;
-    const updateResult = await db.execute(sql50`
+    const updateResult = await db.execute(sql44`
       UPDATE widget_call_sessions 
       SET status = 'completed', 
           duration = ${durationSeconds}, 
@@ -90129,7 +88441,7 @@ router21.post("/widget/session/:sessionId/end", async (req, res) => {
     }
     const widget = await widgetStorage.getWidgetById(session.widgetId);
     if (widget && creditsUsed > 0) {
-      const insertResult = await db.execute(sql50`
+      const insertResult = await db.execute(sql44`
         INSERT INTO credit_transactions (id, user_id, type, amount, description, reference, widget_id, created_at)
         VALUES (gen_random_uuid(), ${session.userId}, 'widget_call', ${-creditsUsed}, 
                 ${"Widget call: " + widget.name}, ${session.id}, ${widget.id}, NOW())
@@ -90137,7 +88449,7 @@ router21.post("/widget/session/:sessionId/end", async (req, res) => {
         RETURNING id
       `);
       if (insertResult.rows && insertResult.rows.length > 0) {
-        await db.update(users).set({ credits: sql50`GREATEST(${users.credits} - ${creditsUsed}, 0)` }).where(eq81(users.id, session.userId));
+        await db.update(users).set({ credits: sql44`GREATEST(${users.credits} - ${creditsUsed}, 0)` }).where(eq81(users.id, session.userId));
       } else {
         console.log(`[Widget] Credit transaction already exists for session ${session.id}, skipping credit deduction`);
       }
@@ -90178,7 +88490,7 @@ router21.post("/widget/session/:sessionId/end", async (req, res) => {
         }
       }
       const existingCall = await db.execute(
-        sql50`SELECT id FROM calls WHERE metadata->>'sessionId' = ${session.id} LIMIT 1`
+        sql44`SELECT id FROM calls WHERE metadata->>'sessionId' = ${session.id} LIMIT 1`
       );
       if (!existingCall.rows || existingCall.rows.length === 0) {
         await db.insert(calls).values({
@@ -90231,7 +88543,7 @@ router21.post("/widget/session/:sessionId/end", async (req, res) => {
               ).join("\n") || "";
               const elAiSummary = typeof conversationDetails.analysis === "string" ? conversationDetails.analysis : conversationDetails.analysis?.transcript_summary || conversationDetails.analysis?.summary || null;
               if (transcriptText || elAiSummary || conversationDetails.call_duration_secs) {
-                await db.execute(sql50`
+                await db.execute(sql44`
                   UPDATE calls
                   SET transcript = COALESCE(NULLIF(transcript, ''), ${transcriptText || null}),
                       ai_summary = COALESCE(ai_summary, ${elAiSummary || null}),
@@ -90885,9 +89197,9 @@ async function registerRoutes(app2) {
       const limits = await storage.getUserEffectiveLimits(req.params.id);
       const subscription = await storage.getUserSubscription(req.params.id);
       const webhookCount = await storage.getUserWebhookCount(req.params.id);
-      const kbCount = await db.select({ count: sql53`count(*)` }).from(knowledgeBase).where(eq84(knowledgeBase.userId, req.params.id));
-      const flowCount = await db.select({ count: sql53`count(*)` }).from(flows).where(eq84(flows.userId, req.params.id));
-      const phoneCount = await db.select({ count: sql53`count(*)` }).from(phoneNumbers).where(eq84(phoneNumbers.userId, req.params.id));
+      const kbCount = await db.select({ count: sql47`count(*)` }).from(knowledgeBase).where(eq84(knowledgeBase.userId, req.params.id));
+      const flowCount = await db.select({ count: sql47`count(*)` }).from(flows).where(eq84(flows.userId, req.params.id));
+      const phoneCount = await db.select({ count: sql47`count(*)` }).from(phoneNumbers).where(eq84(phoneNumbers.userId, req.params.id));
       res.json({
         userId: req.params.id,
         effectiveLimits: limits,
@@ -91885,9 +90197,9 @@ async function registerRoutes(app2) {
     try {
       const limits = await storage.getUserEffectiveLimits(req.userId);
       const webhookCount = await storage.getUserWebhookCount(req.userId);
-      const kbCount = await db.select({ count: sql53`count(*)` }).from(knowledgeBase).where(eq84(knowledgeBase.userId, req.userId));
-      const flowCount = await db.select({ count: sql53`count(*)` }).from(flows).where(eq84(flows.userId, req.userId));
-      const phoneCount = await db.select({ count: sql53`count(*)` }).from(phoneNumbers).where(eq84(phoneNumbers.userId, req.userId));
+      const kbCount = await db.select({ count: sql47`count(*)` }).from(knowledgeBase).where(eq84(knowledgeBase.userId, req.userId));
+      const flowCount = await db.select({ count: sql47`count(*)` }).from(flows).where(eq84(flows.userId, req.userId));
+      const phoneCount = await db.select({ count: sql47`count(*)` }).from(phoneNumbers).where(eq84(phoneNumbers.userId, req.userId));
       res.json({
         webhooks: {
           current: webhookCount,
@@ -92343,7 +90655,7 @@ async function registerRoutes(app2) {
       const campaignsWithBatches = await db.select({
         campaign: campaigns,
         agent: agents
-      }).from(campaigns).leftJoin(agents, eq84(campaigns.agentId, agents.id)).where(sql53`${campaigns.batchJobId} IS NOT NULL`).orderBy(desc20(campaigns.startedAt));
+      }).from(campaigns).leftJoin(agents, eq84(campaigns.agentId, agents.id)).where(sql47`${campaigns.batchJobId} IS NOT NULL`).orderBy(desc20(campaigns.startedAt));
       const batchJobs = await Promise.all(
         campaignsWithBatches.map(async (item) => {
           try {
@@ -92521,7 +90833,7 @@ async function registerRoutes(app2) {
           callDirection: calls.callDirection
         }).from(calls).where(and55(
           isNull17(calls.userId),
-          sql53`NOT COALESCE((COALESCE(metadata, '{}')::jsonb->>'orphaned')::boolean, false)`
+          sql47`NOT COALESCE((COALESCE(metadata, '{}')::jsonb->>'orphaned')::boolean, false)`
         )).orderBy(calls.id).limit(BATCH_SIZE2);
         if (orphanedCalls.length === 0) {
           console.log(`   No more orphaned calls to process`);
@@ -92550,7 +90862,7 @@ async function registerRoutes(app2) {
             } else {
               const currentMetadata = call.campaignId || call.incomingConnectionId ? { orphaned: true, reason: "Owner reference exists but owner not found" } : { orphaned: true, reason: "No campaign or connection reference" };
               await db.update(calls).set({
-                metadata: sql53`COALESCE(metadata, '{}')::jsonb || ${JSON.stringify(currentMetadata)}::jsonb`
+                metadata: sql47`COALESCE(metadata, '{}')::jsonb || ${JSON.stringify(currentMetadata)}::jsonb`
               }).where(eq84(calls.id, call.id));
               failed++;
               if (unresolvedCallIds.length < 500) {
@@ -92670,7 +90982,7 @@ function startPhoneReleaseRetryWorker() {
 // server/services/startup-health-check.ts
 init_db();
 init_schema();
-import { sql as sql55, eq as eq86 } from "drizzle-orm";
+import { sql as sql49, eq as eq86 } from "drizzle-orm";
 init_email_service();
 import * as os3 from "os";
 async function logSystemResources() {
@@ -92730,8 +91042,8 @@ async function runStartupHealthCheck() {
 }
 async function checkDatabase(result) {
   try {
-    await db.execute(sql55`SELECT 1`);
-    const tableCheck = await db.execute(sql55`
+    await db.execute(sql49`SELECT 1`);
+    const tableCheck = await db.execute(sql49`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
@@ -92788,7 +91100,7 @@ async function validateSchemaColumns() {
   };
   for (const [table, columns] of Object.entries(expectedColumns)) {
     try {
-      const result = await db.execute(sql55`
+      const result = await db.execute(sql49`
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_schema = 'public' AND table_name = ${table}
@@ -92990,13 +91302,13 @@ function initializeDirectories() {
 
 // server/index.ts
 init_db();
-import { sql as sql57 } from "drizzle-orm";
+import { sql as sql51 } from "drizzle-orm";
 
 // server/services/sip-transfer-resync.ts
 init_db();
 init_elevenlabs();
 init_elevenlabs_pool();
-import { sql as sql56 } from "drizzle-orm";
+import { sql as sql50 } from "drizzle-orm";
 init_storage();
 init_appointment_elevenlabs_tool();
 var ElevenLabsSipServiceClass = null;
@@ -93019,7 +91331,7 @@ async function resyncSipTrunkConfigs() {
       console.log(`[SIP Config Resync] SIP engine plugin not available, skipping`);
       return;
     }
-    const result = await db.execute(sql56`
+    const result = await db.execute(sql50`
       SELECT sp.id, sp.phone_number, sp.external_elevenlabs_phone_id, sp.user_id,
              st.id as trunk_id, st.sip_host, st.sip_port, st.transport, st.provider,
              st.username, st.password, st.media_encryption
@@ -93070,7 +91382,7 @@ async function resyncSipTrunkConfigs() {
 }
 async function resyncSipAgentTransferTools() {
   try {
-    const result = await db.execute(sql56`
+    const result = await db.execute(sql50`
       SELECT a.id, a.name, a.type, a.eleven_labs_agent_id, a.transfer_phone_number,
              st.sip_host, st.sip_port, st.transport
       FROM agents a
@@ -93129,7 +91441,7 @@ async function resyncSipAgentTransferTools() {
 async function resyncAppointmentWebhookUrls() {
   try {
     getAppointmentWebhookSecret();
-    const result = await db.execute(sql56`
+    const result = await db.execute(sql50`
       SELECT id, name, eleven_labs_agent_id
       FROM agents
       WHERE appointment_booking_enabled = true
@@ -93168,7 +91480,7 @@ async function resyncFormWebhookUrls() {
   try {
     const { getFormWebhookSecret: getFormWebhookSecret2, getSubmitFormWebhookTool: getSubmitFormWebhookTool2 } = await Promise.resolve().then(() => (init_form_elevenlabs_tool(), form_elevenlabs_tool_exports));
     getFormWebhookSecret2();
-    const result = await db.execute(sql56`
+    const result = await db.execute(sql50`
       SELECT id, name, eleven_labs_agent_id, flow_id, user_id
       FROM agents
       WHERE flow_id IS NOT NULL
@@ -93261,7 +91573,7 @@ async function resyncMessagingWebhookUrls() {
     const { flows: flows3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { eq: eq87 } = await import("drizzle-orm");
     const { db: dbInner } = await Promise.resolve().then(() => (init_db(), db_exports));
-    const result = await db.execute(sql56`
+    const result = await db.execute(sql50`
       SELECT id, name, eleven_labs_agent_id, flow_id
       FROM agents
       WHERE flow_id IS NOT NULL
@@ -93480,7 +91792,7 @@ app.use((req, res, next) => {
     console.error("\u26A0\uFE0F [Startup] Database seeding failed (non-fatal):", error);
   }
   try {
-    await db.execute(sql57`UPDATE phone_numbers SET status = 'active' WHERE status = 'assigned'`);
+    await db.execute(sql51`UPDATE phone_numbers SET status = 'active' WHERE status = 'assigned'`);
   } catch (error) {
     console.error("\u26A0\uFE0F [Startup] Phone status normalization failed (non-fatal):", error);
   }
