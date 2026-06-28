@@ -274,9 +274,48 @@ export class OpenAIAgentFactory {
             params.contactPhone = callerPhone;
             console.log(`[Appointment Tool] Auto-filled caller phone: ${callerPhone}`);
           }
-          
+
+          // Normalize date to YYYY-MM-DD (AI may send "June 30", "30 June 2026", etc.)
+          if (params.appointmentDate) {
+            const raw = String(params.appointmentDate).trim();
+            const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!isoMatch) {
+              const parsed = new Date(raw);
+              if (!isNaN(parsed.getTime())) {
+                const y = parsed.getFullYear();
+                const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                const d = String(parsed.getDate()).padStart(2, '0');
+                params.appointmentDate = `${y}-${m}-${d}`;
+              }
+            }
+          }
+
+          // Normalize time to HH:MM 24h (AI may send "10:30 AM", "2:30 PM", "2pm", etc.)
+          if (params.appointmentTime) {
+            const raw = String(params.appointmentTime).trim();
+            const hhmm = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(am|pm))?$/i);
+            if (hhmm) {
+              let h = parseInt(hhmm[1], 10);
+              const min = hhmm[2];
+              const meridiem = (hhmm[4] || '').toLowerCase();
+              if (meridiem === 'pm' && h < 12) h += 12;
+              if (meridiem === 'am' && h === 12) h = 0;
+              params.appointmentTime = `${String(h).padStart(2, '0')}:${min}`;
+            } else {
+              // Try "2pm", "10am" shorthand
+              const short = raw.match(/^(\d{1,2})\s*(am|pm)$/i);
+              if (short) {
+                let h = parseInt(short[1], 10);
+                const meridiem = short[2].toLowerCase();
+                if (meridiem === 'pm' && h < 12) h += 12;
+                if (meridiem === 'am' && h === 12) h = 0;
+                params.appointmentTime = `${String(h).padStart(2, '0')}:00`;
+              }
+            }
+          }
+
           console.log(`[Appointment Tool] Booking: ${JSON.stringify(params)}`);
-          
+
           // Validate required parameters
           if (!params.contactName || !params.contactPhone || !params.appointmentDate || !params.appointmentTime) {
             return {
@@ -464,7 +503,7 @@ export class OpenAIAgentFactory {
           console.error(`[Appointment Tool] Error:`, error.message, error.stack);
           return { 
             success: false, 
-            message: 'Unable to book appointment at this time. Please try again.' 
+            message: 'Unable to book appointment at this time. Do NOT retry. Tell the caller there was a technical issue and continue the conversation.'
           };
         }
       },
