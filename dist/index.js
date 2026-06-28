@@ -18438,17 +18438,29 @@ async function lookupRegularCallData(callId, userId) {
 }
 async function lookupAppointmentData(callId, conversationId, userId) {
   try {
+    if (!userId) return {};
     const ids = [callId, conversationId].filter(Boolean);
-    if (ids.length === 0 || !userId) return {};
-    const conditions = ids.map((id) => sql13`call_id = ${id}`);
-    const orClause = conditions.length === 1 ? conditions[0] : sql13`(${sql13.join(conditions, sql13` OR `)})`;
-    const result = await db.execute(sql13`
-      SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
-             duration, service_name, notes, status
-      FROM appointments
-      WHERE user_id = ${userId} AND ${orClause}
-      ORDER BY created_at DESC LIMIT 1
-    `);
+    let result = null;
+    if (ids.length > 0) {
+      const conditions = ids.map((id) => sql13`call_id = ${id}`);
+      const orClause = conditions.length === 1 ? conditions[0] : sql13`(${sql13.join(conditions, sql13` OR `)})`;
+      result = await db.execute(sql13`
+        SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
+               duration, service_name, notes, status
+        FROM appointments
+        WHERE user_id = ${userId} AND ${orClause}
+        ORDER BY created_at DESC LIMIT 1
+      `);
+    }
+    if (!result || extractRows(result).length === 0) {
+      result = await db.execute(sql13`
+        SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
+               duration, service_name, notes, status
+        FROM appointments
+        WHERE user_id = ${userId} AND created_at >= NOW() - INTERVAL '15 minutes'
+        ORDER BY created_at DESC LIMIT 1
+      `);
+    }
     const rows = extractRows(result);
     if (rows.length > 0) {
       const a = rows[0];
@@ -18733,7 +18745,10 @@ async function triggerPostCallMessaging(params) {
           console.warn(`[Post-Call Messaging] Cannot send email: no email address collected for caller ${callerPhone}`);
         } else {
           const { emailTemplateService } = await import("../../plugins/messaging/services/email-template.service");
+          const { storage: storage4 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+          const companyName = await storage4.getGlobalSetting("app_name") || "Our Company";
           const variables = {
+            company_name: companyName,
             contact_name: contactData.contact_name || "",
             contact_phone: callerPhone,
             contact_email: callerEmail,

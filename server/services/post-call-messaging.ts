@@ -148,17 +148,33 @@ async function lookupRegularCallData(callId: string, userId: string): Promise<Re
 
 async function lookupAppointmentData(callId: string, conversationId: string, userId: string): Promise<Record<string, string>> {
   try {
+    if (!userId) return {};
     const ids = [callId, conversationId].filter(Boolean);
-    if (ids.length === 0 || !userId) return {};
-    const conditions = ids.map(id => sql`call_id = ${id}`);
-    const orClause = conditions.length === 1 ? conditions[0] : sql`(${sql.join(conditions, sql` OR `)})`;
-    const result = await db.execute(sql`
-      SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
-             duration, service_name, notes, status
-      FROM appointments
-      WHERE user_id = ${userId} AND ${orClause}
-      ORDER BY created_at DESC LIMIT 1
-    `);
+
+    // First try matching by call_id
+    let result: any = null;
+    if (ids.length > 0) {
+      const conditions = ids.map(id => sql`call_id = ${id}`);
+      const orClause = conditions.length === 1 ? conditions[0] : sql`(${sql.join(conditions, sql` OR `)})`;
+      result = await db.execute(sql`
+        SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
+               duration, service_name, notes, status
+        FROM appointments
+        WHERE user_id = ${userId} AND ${orClause}
+        ORDER BY created_at DESC LIMIT 1
+      `);
+    }
+
+    // Fallback: most recent appointment for this user in the last 15 minutes (handles empty call_id)
+    if (!result || extractRows(result).length === 0) {
+      result = await db.execute(sql`
+        SELECT contact_name, contact_phone, contact_email, appointment_date, appointment_time,
+               duration, service_name, notes, status
+        FROM appointments
+        WHERE user_id = ${userId} AND created_at >= NOW() - INTERVAL '15 minutes'
+        ORDER BY created_at DESC LIMIT 1
+      `);
+    }
     const rows = extractRows(result);
     if (rows.length > 0) {
       const a = rows[0];
@@ -487,7 +503,10 @@ export async function triggerPostCallMessaging(params: {
           console.warn(`[Post-Call Messaging] Cannot send email: no email address collected for caller ${callerPhone}`);
         } else {
           const { emailTemplateService } = await import('../../plugins/messaging/services/email-template.service');
+          const { storage } = await import('../storage');
+          const companyName = await storage.getGlobalSetting('app_name') || 'Our Company';
           const variables: Record<string, string> = {
+            company_name: companyName,
             contact_name: contactData.contact_name || '',
             contact_phone: callerPhone,
             contact_email: callerEmail,
