@@ -116,6 +116,16 @@ export class AudioBridgeService {
   private static activeSessions: Map<string, AudioBridgeSession> = new Map();
   private static pendingTransfers: Map<string, { targetNumber: string; callerId: string }> = new Map();
   private static readonly OPENAI_REALTIME_URL = 'wss://api.openai.com/v1/realtime';
+
+  // Map internal model aliases → real OpenAI Realtime API model IDs
+  private static readonly MODEL_ALIAS: Record<string, string> = {
+    'gpt-realtime-2':         'gpt-4o-realtime-preview',
+    'gpt-realtime-1.5':       'gpt-4o-realtime-preview',
+    'gpt-realtime':           'gpt-4o-realtime-preview',
+    'gpt-realtime-translate': 'gpt-4o-realtime-preview',
+    'gpt-realtime-whisper':   'gpt-4o-realtime-preview',
+    'gpt-realtime-mini':      'gpt-4o-mini-realtime-preview',
+  };
   private static readonly INPUT_SAMPLE_RATE = 8000;  // Plivo mulaw
   private static readonly OUTPUT_SAMPLE_RATE = 24000; // OpenAI Realtime
 
@@ -215,8 +225,9 @@ export class AudioBridgeService {
     return new Promise((resolve, reject) => {
       const { agentConfig, callUuid } = session;
 
-      // Build WebSocket URL with model
-      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${agentConfig.model}`;
+      // Resolve internal model alias to real OpenAI model ID
+      const resolvedModel = this.MODEL_ALIAS[agentConfig.model] ?? agentConfig.model;
+      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${resolvedModel}`;
 
       logger.info(`Connecting to OpenAI Realtime: ${agentConfig.model}`, undefined, 'AudioBridge');
 
