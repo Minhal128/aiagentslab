@@ -5,7 +5,7 @@
  * ============================================================
  */
 
-export type OpenAIVoice = 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse' | 'cedar' | 'marin' | 'arjun';
+export type OpenAIVoice = 'alloy' | 'echo' | 'shimmer' | 'ash' | 'ballad' | 'coral' | 'sage' | 'verse' | 'cedar' | 'marin' | 'arjun' | 'priya';
 
 export type OpenAIRealtimeModel = 
   | 'gpt-realtime-2'
@@ -211,6 +211,7 @@ export const OPENAI_VOICES: { id: OpenAIVoice; name: string; description: string
   { id: 'cedar', name: 'Cedar', description: 'Deep, grounded voice' },
   { id: 'marin', name: 'Marin', description: 'Bright, cheerful voice' },
   { id: 'arjun', name: 'Arjun', description: 'Warm Indian tone' },
+  { id: 'priya', name: 'Priya', description: 'Warm Indian female tone' },
 ];
 
 export const MODEL_TIER_CONFIG: Record<ModelTier, { models: OpenAIRealtimeModel[]; description: string }> = {

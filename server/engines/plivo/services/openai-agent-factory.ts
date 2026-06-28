@@ -64,7 +64,7 @@ export class OpenAIAgentFactory {
    */
   static validateVoice(voice: string): OpenAIVoice {
     // Map display-only voices to actual OpenAI API voices
-    const voiceAliasMap: Record<string, OpenAIVoice> = { arjun: 'echo' };
+    const voiceAliasMap: Record<string, OpenAIVoice> = { arjun: 'echo', priya: 'shimmer' };
     const resolved = voiceAliasMap[voice] ?? voice;
     const validVoice = OPENAI_VOICES.find(v => v.id === resolved);
     if (!validVoice) {

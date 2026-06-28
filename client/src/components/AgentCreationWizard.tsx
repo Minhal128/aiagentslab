@@ -197,6 +197,7 @@ const openaiVoices = [
   { value: "cedar", label: "Cedar", description: "Deep and grounded" },
   { value: "marin", label: "Marin", description: "Fresh and lively" },
   { value: "arjun", label: "Arjun", description: "Warm Indian tone" },
+  { value: "priya", label: "Priya", description: "Warm Indian female tone" },
 ];
 
 interface AgentCreationWizardProps {
