@@ -339,7 +339,12 @@ FUNCTION CALLING REQUIREMENTS:
 5. These function calls are MANDATORY. Data will NOT be saved unless you call the functions.
 
 BACKGROUND NOISE:
-Ignore all background noise, music, TV, or ambient sounds. Only respond to the primary caller speaking directly to you.`;
+Ignore all background noise, music, TV, or ambient sounds. Only respond to the primary caller speaking directly to you.
+
+ERROR HANDLING — MANDATORY:
+- If any tool or function call returns an error or success: false, do NOT call it again.
+- Mention the failure to the caller ONCE with a brief friendly message, then continue the conversation normally.
+- Never repeat an error message. Never get stuck retrying a failed action. Move forward.`;
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
@@ -1494,11 +1499,11 @@ Ignore all background noise, music, TV, or ambient sounds. Only respond to the p
         success: result.success,
         message: result.success
           ? `Email sent successfully to ${recipientEmail}`
-          : `Failed to send email: ${result.error}`,
+          : `Email could not be sent (${result.error}). Do NOT retry this action. Tell the caller politely that the email could not be delivered, then continue the conversation normally.`,
       };
     } catch (error: any) {
       logger.error(`send_email error: ${error.message}`, error, 'AudioBridge');
-      return { success: false, message: 'Error sending email.' };
+      return { success: false, message: 'Email sending failed due to a technical error. Do NOT retry. Inform the caller once that the email could not be sent, then continue the conversation.' };
     }
   }
 

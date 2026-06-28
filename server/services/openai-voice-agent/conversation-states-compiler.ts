@@ -160,7 +160,13 @@ ${statesJson}
 - SEND WHATSAPP: When instructed to send a WhatsApp message, you MUST call the appropriate send_whatsapp_* function with the caller's phone number and template name.
 - KNOWLEDGE BASE: When you need information to answer a question, use the lookup_knowledge_base or query_knowledge_base function.
 
-Remember: Saying you will do something is NOT the same as actually calling the tool. You MUST call the appropriate function to perform any action.`;
+Remember: Saying you will do something is NOT the same as actually calling the tool. You MUST call the appropriate function to perform any action.
+
+# CRITICAL ERROR HANDLING RULES
+- If a tool call returns success: false or an error message, you MUST stop and NOT call that tool again.
+- Report the failure to the caller ONCE with a brief, friendly message (e.g. "I'm sorry, I wasn't able to send the email right now.").
+- After reporting the failure once, immediately continue the conversation normally. Do NOT repeat the error. Do NOT retry the failed action.
+- Never get stuck repeating the same error message. Move the conversation forward after any failure.`;
   }
 
   /**

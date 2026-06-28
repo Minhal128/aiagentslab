@@ -692,13 +692,13 @@ function createMessagingEmailHandler(
         success: result.success,
         message: result.success
           ? `Email sent successfully to ${recipientEmail} using template "${template}".`
-          : `Failed to send email: ${result.error || 'Unknown error'}`
+          : `Email could not be sent (${result.error || 'Unknown error'}). Do NOT retry this action. Tell the caller politely that the email could not be delivered, then continue the conversation normally.`
       };
     } catch (error: any) {
       console.error(`[Send Email Tool] Error:`, error.message);
       return {
         success: false,
-        message: 'Unable to send email at this time. Please try again later.'
+        message: 'Email sending failed due to a technical error. Do NOT retry. Inform the caller once that the email could not be sent, then continue the conversation.'
       };
     }
   };
