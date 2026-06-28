@@ -2665,9 +2665,10 @@ router.get("/appointments", async (req: AuthRequest, res: Response) => {
     }
 
     const userId = req.userId!;
+    const isAdmin = req.userRole === 'admin';
     const { startDate, endDate, status } = req.query;
 
-    const conditions: any[] = [eq(appointments.userId, userId)];
+    const conditions: any[] = isAdmin ? [] : [eq(appointments.userId, userId)];
 
     if (startDate && typeof startDate === 'string') {
       const parsedStartDate = new Date(startDate);
@@ -2688,7 +2689,7 @@ router.get("/appointments", async (req: AuthRequest, res: Response) => {
     const result = await db
       .select()
       .from(appointments)
-      .where(and(...conditions))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(appointments.appointmentDate, appointments.appointmentTime);
 
     const appointmentsWithScheduledFor = result.map(apt => ({
