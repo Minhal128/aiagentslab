@@ -360,7 +360,14 @@ export class PlivoCallService {
       return { callUuid, plivoCall: updatedCall };
 
     } catch (error: any) {
-      logger.error('Failed to initiate call', error, 'PlivoCall');
+      // Log detailed Plivo error info to help diagnose 403 / auth failures
+      const statusCode = error?.statusCode || error?.response?.status || error?.status;
+      const responseBody = error?.response?.data || error?.body || error?.message;
+      logger.error(`Failed to initiate call — HTTP ${statusCode || 'unknown'}: ${JSON.stringify(responseBody)}`, error, 'PlivoCall');
+      if (statusCode === 403) {
+        logger.error('Plivo 403 Forbidden — check: (1) authId/authToken are correct, (2) fromNumber is active on this account, (3) account has outbound calling enabled, (4) destination number is not blocked', undefined, 'PlivoCall');
+        logger.error(`fromNumber used: ${params.fromNumber} | toNumber: ${params.toNumber}`, undefined, 'PlivoCall');
+      }
 
       await OpenAIPoolService.releaseSlot(openaiCredential.id);
 
@@ -372,6 +379,7 @@ export class PlivoCallService {
           metadata: {
             ...(callRecord.metadata as Record<string, unknown> || {}),
             error: error.message,
+            httpStatus: statusCode,
           },
         })
         .where(eq(plivoCalls.id, callRecord.id));

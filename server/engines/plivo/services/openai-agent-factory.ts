@@ -471,6 +471,9 @@ export class OpenAIAgentFactory {
             }
           }
           
+          console.log(`[Appointment Tool] ✅ All checks passed. Inserting into DB: userId=${userId} callId=${callId || 'none'} agentId=${agentId}`);
+          console.log(`[Appointment Tool]    → name="${params.contactName}" phone="${params.contactPhone}" date="${params.appointmentDate}" time="${params.appointmentTime}"`);
+
           const appointmentId = nanoid();
           const [newAppointment] = await db
             .insert(appointments)
@@ -491,18 +494,23 @@ export class OpenAIAgentFactory {
               metadata: { source: 'openai-agent', agentId },
             })
             .returning();
-          
-          console.log(`[Appointment Tool] Created appointment ${appointmentId}`);
-          
-          return { 
-            success: true, 
+
+          if (newAppointment) {
+            console.log(`[Appointment Tool] 🎉 SUCCESS: appointment ${appointmentId} saved to DB`);
+          } else {
+            console.error(`[Appointment Tool] ❌ DB insert returned no rows — possible constraint violation`);
+          }
+
+          return {
+            success: true,
             appointmentId,
-            message: `Appointment booked for ${params.contactName} on ${params.appointmentDate} at ${params.appointmentTime}` 
+            message: `Appointment booked for ${params.contactName} on ${params.appointmentDate} at ${params.appointmentTime}`
           };
         } catch (error: any) {
-          console.error(`[Appointment Tool] Error:`, error.message, error.stack);
-          return { 
-            success: false, 
+          console.error(`[Appointment Tool] ❌ DB ERROR: ${error.message}`);
+          console.error(`[Appointment Tool]    Stack: ${error.stack}`);
+          return {
+            success: false,
             message: 'Unable to book appointment at this time. Do NOT retry. Tell the caller there was a technical issue and continue the conversation.'
           };
         }

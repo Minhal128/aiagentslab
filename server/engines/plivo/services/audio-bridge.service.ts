@@ -348,28 +348,27 @@ ERROR HANDLING — MANDATORY:
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
+    // Flat format required by OpenAI Realtime API — nested audio.input/audio.output is ignored.
     const sessionConfig = {
       type: 'session.update',
       session: {
-        type: 'realtime',
+        modalities: ['text', 'audio'],
         instructions: enhancedInstructions,
-        audio: {
-          input: {
-            format: { type: 'audio/pcm', rate: 24000 },
-            transcription: { model: 'whisper-1' },
-            turn_detection: turnDetection,
-          },
-          output: {
-            format: { type: 'audio/pcm', rate: 24000 },
-            voice: agentConfig.voice,
-          },
-        },
+        voice: agentConfig.voice,
+        input_audio_format: 'pcm16',
+        output_audio_format: 'pcm16',
+        input_audio_transcription: { model: 'whisper-1' },
+        turn_detection: turnDetection,
         tools,
         tool_choice: tools.length > 0 ? 'auto' : 'none',
+        temperature: agentConfig.temperature ?? 0.7,
       },
     };
 
-    logger.info(`Configuring session with ${tools.length} tools`, undefined, 'AudioBridge');
+    logger.info(`Configuring session with ${tools.length} tools, VAD=${vadType}`, undefined, 'AudioBridge');
+    if (tools.length > 0) {
+      logger.info(`Tools configured: ${tools.map((t: any) => t.name || t.function?.name).join(', ')}`, undefined, 'AudioBridge');
+    }
     openaiWs.send(JSON.stringify(sessionConfig));
 
     // First message is now sent when Plivo stream starts (see markStreamReady)
