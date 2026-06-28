@@ -53,6 +53,23 @@ interface Campaign {
   successfulCalls: number;
   deletedAt?: string | null;
   phoneNumberId?: string | null;
+  plivoPhoneNumberId?: string | null;
+  sipPhoneNumberId?: string | null;
+  agentId?: string | null;
+  goal?: string | null;
+  script?: string | null;
+  scheduleEnabled?: boolean;
+  scheduleTimeStart?: string | null;
+  scheduleTimeEnd?: string | null;
+  scheduleDays?: string[];
+  scheduleTimezone?: string | null;
+  retryEnabled?: boolean;
+  retryMaxAttempts?: number;
+  retryIntervalMinutes?: number;
+  retryOnNoAnswer?: boolean;
+  retryOnBusy?: boolean;
+  retryOnFailed?: boolean;
+  currentRetryPass?: number;
   errorMessage?: string | null;
   errorCode?: string | null;
 }
