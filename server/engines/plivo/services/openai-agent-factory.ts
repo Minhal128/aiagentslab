@@ -271,14 +271,20 @@ export class OpenAIAgentFactory {
             description: 'Additional notes or requirements' 
           },
         },
-        required: ['contactName', 'contactPhone', 'appointmentDate', 'appointmentTime'],
+        required: callerPhone
+          ? ['appointmentDate', 'appointmentTime']
+          : ['contactName', 'contactPhone', 'appointmentDate', 'appointmentTime'],
       },
       handler: async (params: Record<string, unknown>) => {
         try {
-          // Auto-fill caller phone if AI didn't provide one or sent a placeholder
+          // Auto-fill caller phone — always use caller's number if not explicitly provided
           if (callerPhone && (!params.contactPhone || params.contactPhone === 'USE_CALLER_NUMBER' || params.contactPhone === 'same')) {
             params.contactPhone = callerPhone;
             console.log(`[Appointment Tool] Auto-filled caller phone: ${callerPhone}`);
+          }
+          // Default name to "Customer" if not collected — don't block booking over a name
+          if (!params.contactName) {
+            params.contactName = 'Customer';
           }
 
           // Normalize date to YYYY-MM-DD (AI may send "June 30", "30 June 2026", etc.)

@@ -302,9 +302,9 @@ export class AudioBridgeService {
     // Improved defaults for better call quality - less aggressive interruption
     const vadSettings = agentConfig.vadSettings || {};
     const vadType = vadSettings.type ?? 'server_vad';
-    const vadThreshold = vadSettings.threshold ?? 0.6;
-    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 400;
-    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 500;
+    const vadThreshold = vadSettings.threshold ?? 0.3;
+    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 200;
+    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 300;
     const vadEagerness = vadSettings.eagerness ?? 'medium';
 
     logger.info(`VAD settings: type=${vadType}, threshold=${vadThreshold}, prefix=${vadPrefixPaddingMs}ms, silence=${vadSilenceDurationMs}ms`, undefined, 'AudioBridge');
@@ -328,27 +328,25 @@ export class AudioBridgeService {
     // Append mandatory function calling requirements to system prompt
     const functionCallingRequirements = `
 
-CONVERSATION BEHAVIOR — MANDATORY:
-1. Ask ONE question at a time, then STOP and wait silently for the caller to answer. Never ask multiple questions in a row.
-2. Once the caller provides information (name, date, phone, etc.), do NOT ask for it again. Remember everything said earlier in the call.
-3. Keep each response SHORT — 1-2 sentences maximum. If you need to explain more, pause after each sentence and wait for the caller to signal they want to continue.
-4. After asking a question, say nothing more. Wait for the caller to respond before speaking again.
-5. If the caller is already speaking, stop your response immediately and listen.
+STRICT CONVERSATION RULES — ALWAYS FOLLOW:
+1. ONE sentence per turn. Stop. Wait for the caller to respond. Never speak two turns in a row without hearing the caller.
+2. If the caller starts speaking while you are talking — STOP IMMEDIATELY. Listen. Then respond to what they said.
+3. Never repeat the same sentence or idea twice in a conversation. If you already said something, do not say it again.
+4. Never ask for information the caller already provided. Remember everything from earlier in the call.
+5. Do NOT keep redirecting to the same person or action repeatedly. Once you have mentioned something, move on.
 
-FUNCTION CALLING REQUIREMENTS:
-1. After collecting all form information from the user, you MUST call the submit_form function with the collected data. Do NOT just say "I have recorded your information" - you MUST actually call the submit_form function to save the data.
-2. After completing the main task (like form submission), say a friendly closing message and ask if there's anything else. Wait for the user to respond.
-3. Only call the end_call function AFTER the user confirms they are done or says goodbye. Do not hang up immediately after completing a task - give the user a chance to respond.
-4. When the user says goodbye or confirms they are done, THEN call the end_call function to disconnect.
-5. These function calls are MANDATORY. Data will NOT be saved unless you call the functions.
+BOOKING RULE — CRITICAL:
+- When the caller agrees to a date and time, call book_appointment IMMEDIATELY. Do not say "I am booking" — just call the tool silently and then confirm once it succeeds.
+- contactPhone is auto-filled from the caller's number. You do NOT need to ask for it.
+- contactName defaults to "Customer" if unknown. Do NOT block the booking waiting for a name.
+- Only ask for date and time. That is all you need.
 
-BACKGROUND NOISE:
-Ignore all background noise, music, TV, or ambient sounds. Only respond to the primary caller speaking directly to you.
+TOOL RULES:
+- submit_form: call it immediately when form data is collected. Do NOT say you submitted without calling it.
+- end_call: only after the caller says goodbye or confirms they are done.
+- If a tool returns error: say it failed ONCE, then move forward. Never retry.
 
-ERROR HANDLING — MANDATORY:
-- If any tool or function call returns an error or success: false, do NOT call it again.
-- Mention the failure to the caller ONCE with a brief friendly message, then continue the conversation normally.
-- Never repeat an error message. Never get stuck retrying a failed action. Move forward.`;
+BACKGROUND NOISE: Ignore all background sound. Only respond to the primary caller.`;
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
