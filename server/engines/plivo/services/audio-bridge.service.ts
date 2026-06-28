@@ -187,7 +187,11 @@ export class AudioBridgeService {
     // Register tool handlers from agent config
     if (agentConfig.tools) {
       for (const tool of agentConfig.tools) {
-        session.toolHandlers.set(tool.name, tool.handler);
+        if (tool.handler) {
+          session.toolHandlers.set(tool.name, tool.handler);
+        } else {
+          logger.warn(`Tool "${tool.name}" has no handler — will not be dispatchable`, undefined, 'AudioBridge');
+        }
       }
     }
 

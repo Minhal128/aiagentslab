@@ -297,6 +297,33 @@ function createAppointmentHandler(
         sunday: { start: "09:00", end: "17:00", enabled: false },
       };
       
+      // Normalize date to YYYY-MM-DD
+      if (params.appointmentDate) {
+        const raw = String(params.appointmentDate).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const parsed = new Date(raw);
+          if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear();
+            const mo = String(parsed.getMonth() + 1).padStart(2, '0');
+            const d = String(parsed.getDate()).padStart(2, '0');
+            params.appointmentDate = `${y}-${mo}-${d}`;
+          }
+        }
+      }
+      // Normalize time to HH:MM 24h
+      if (params.appointmentTime) {
+        const raw = String(params.appointmentTime).trim();
+        const ampm = raw.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+        if (ampm) {
+          let h = parseInt(ampm[1], 10);
+          const m = parseInt(ampm[2] || '0', 10);
+          const isPm = ampm[3].toLowerCase() === 'pm';
+          if (isPm && h !== 12) h += 12;
+          if (!isPm && h === 12) h = 0;
+          params.appointmentTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+      }
+
       // Validate working hours
       const appointmentDate = params.appointmentDate as string;
       const appointmentTime = params.appointmentTime as string;

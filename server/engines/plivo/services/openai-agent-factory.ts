@@ -209,10 +209,16 @@ export class OpenAIAgentFactory {
     callId?: string,
     callerPhone?: string
   ): AgentConfigWithContext {
-    // Skip if appointment tool already exists to prevent duplicates
-    if (config.tools?.some(t => t.name === 'book_appointment')) {
-      console.log(`[Agent Factory] Appointment tool already exists, skipping`);
+    // Skip only if appointment tool already exists WITH a live handler
+    const existingApptTool = config.tools?.find(t => t.name === 'book_appointment');
+    if (existingApptTool?.handler) {
+      console.log(`[Agent Factory] Appointment tool already exists with handler, skipping`);
       return config;
+    }
+    // If tool exists but has no handler (e.g. deserialized from JSON), remove it so we re-add properly
+    if (existingApptTool) {
+      console.log(`[Agent Factory] Appointment tool exists without handler — replacing with live handler`);
+      config = { ...config, tools: config.tools?.filter(t => t.name !== 'book_appointment') };
     }
     
     console.log(`[Agent Factory] Adding appointment tool for agent ${agentId}`);
