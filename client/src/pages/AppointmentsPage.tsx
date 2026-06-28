@@ -440,6 +440,8 @@ export default function AppointmentsPage() {
 
   const { data: allAppointments = [], isLoading } = useQuery<Appointment[]>({
     queryKey: ["/api/flow-automation/appointments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: settings } = useQuery<AppointmentSettings>({
