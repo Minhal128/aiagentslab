@@ -1484,8 +1484,10 @@ export function createAgentRoutes(ctx: RouteContext): Router {
         return res.status(400).json({ error: "Voice ID is required" });
       }
 
+      const voiceAliasMap: Record<string, string> = { arjun: 'echo', priya: 'shimmer' };
+      const resolvedVoiceId = voiceAliasMap[voiceId] ?? voiceId;
       const validVoices = ["alloy", "echo", "shimmer", "ash", "ballad", "coral", "sage", "verse", "cedar", "marin"];
-      if (!validVoices.includes(voiceId)) {
+      if (!validVoices.includes(resolvedVoiceId)) {
         return res.status(400).json({ error: `Invalid voice. Must be one of: ${validVoices.join(", ")}` });
       }
 
@@ -1509,7 +1511,7 @@ export function createAgentRoutes(ctx: RouteContext): Router {
         body: JSON.stringify({
           model: "tts-1",
           input: previewText,
-          voice: voiceId,
+          voice: resolvedVoiceId,
           response_format: "mp3",
           speed: speed || 1.0,
         }),
