@@ -119,12 +119,11 @@ export class AudioBridgeService {
 
   // Map internal model aliases → real OpenAI Realtime API model IDs
   private static readonly MODEL_ALIAS: Record<string, string> = {
-    'gpt-realtime-2':         'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-realtime-1.5':       'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-realtime':           'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-realtime-translate': 'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-realtime-whisper':   'gpt-4o-realtime-preview-2024-12-17',
-    'gpt-realtime-mini':      'gpt-4o-mini-realtime-preview',
+    'gpt-realtime-2':         'gpt-realtime-1.5',
+    'gpt-realtime':           'gpt-realtime-1.5',
+    'gpt-realtime-translate': 'gpt-realtime-1.5',
+    'gpt-realtime-whisper':   'gpt-realtime-1.5',
+    'gpt-realtime-mini':      'gpt-realtime-1.5',
   };
   private static readonly INPUT_SAMPLE_RATE = 8000;  // Plivo mulaw
   private static readonly OUTPUT_SAMPLE_RATE = 24000; // OpenAI Realtime
