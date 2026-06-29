@@ -4688,12 +4688,11 @@ export async function handleAppointmentToolWebhook(req: Request, res: Response) 
       console.log(`📅 [Appointment Webhook] Caller provided different phone: ${contactPhone} (call record: ${verifiedCallerPhone})`);
     }
     
+    // ponytail: if phone can't be resolved (race: call record not yet written when webhook fires mid-call),
+    // save the appointment with a 'unknown' placeholder so it isn't silently dropped.
+    // The admin can correct the phone from the appointments dashboard.
     if (!finalContactPhone) {
-      console.warn(`📅 [Appointment Webhook] No phone number available - call not matched and AI didn't collect phone`);
-      return res.json({
-        success: false,
-        message: "I couldn't identify your phone number. Could you please provide a contact number for the appointment?"
-      });
+      console.warn(`📅 [Appointment Webhook] No phone number available - saving appointment with unknown phone`);
     }
     
     if (!appointmentDate || !appointmentTime) {
@@ -4896,7 +4895,7 @@ export async function handleAppointmentToolWebhook(req: Request, res: Response) 
         callId: validatedCallId,
         flowId: flowId || null,
         contactName: finalContactName,
-        contactPhone: finalContactPhone,
+        contactPhone: finalContactPhone || 'unknown',
         contactEmail: contactEmail || null,
         appointmentDate: finalDate,
         appointmentTime: finalTime,

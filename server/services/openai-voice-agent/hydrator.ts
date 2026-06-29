@@ -297,15 +297,26 @@ function createAppointmentHandler(
         sunday: { start: "09:00", end: "17:00", enabled: false },
       };
       
-      // Normalize date to YYYY-MM-DD
+      // Normalize date to YYYY-MM-DD — handle both ISO dates and relative terms ("tomorrow", "next Monday")
       if (params.appointmentDate) {
         const raw = String(params.appointmentDate).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-          const parsed = new Date(raw);
-          if (!isNaN(parsed.getTime())) {
-            const y = parsed.getFullYear();
-            const mo = String(parsed.getMonth() + 1).padStart(2, '0');
-            const d = String(parsed.getDate()).padStart(2, '0');
+          const lower = raw.toLowerCase();
+          const now = new Date();
+          // ponytail: handle common relative terms before falling back to Date() which can't parse them
+          let resolved: Date | null = null;
+          if (lower === 'tomorrow') resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+          else if (lower === 'today') resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          else if (lower === 'day after tomorrow') resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+          else if (lower.includes('next week')) resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+          else {
+            const parsed = new Date(raw);
+            if (!isNaN(parsed.getTime())) resolved = parsed;
+          }
+          if (resolved) {
+            const y = resolved.getFullYear();
+            const mo = String(resolved.getMonth() + 1).padStart(2, '0');
+            const d = String(resolved.getDate()).padStart(2, '0');
             params.appointmentDate = `${y}-${mo}-${d}`;
           }
         }

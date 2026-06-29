@@ -250,9 +250,10 @@ export class OpenAIAgentFactory {
             type: 'string', 
             description: 'Optional email address' 
           },
-          appointmentDate: { 
-            type: 'string', 
-            description: 'Appointment date in YYYY-MM-DD format' 
+          appointmentDate: {
+            type: 'string',
+            // ponytail: no baked-in date — server resolves relative terms at call time
+            description: 'Appointment date. Pass what the caller said exactly: "tomorrow", "kal", "next Monday", "parson", "agle hafte", or a specific date. Do NOT convert to YYYY-MM-DD yourself — the server will resolve it.'
           },
           appointmentTime: { 
             type: 'string', 
@@ -287,17 +288,39 @@ export class OpenAIAgentFactory {
             params.contactName = 'Customer';
           }
 
-          // Normalize date to YYYY-MM-DD (AI may send "June 30", "30 June 2026", etc.)
+          // Normalize date to YYYY-MM-DD — handle relative terms including Urdu/Hindi
           if (params.appointmentDate) {
             const raw = String(params.appointmentDate).trim();
-            const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            if (!isoMatch) {
-              const parsed = new Date(raw);
-              if (!isNaN(parsed.getTime())) {
-                const y = parsed.getFullYear();
-                const m = String(parsed.getMonth() + 1).padStart(2, '0');
-                const d = String(parsed.getDate()).padStart(2, '0');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+              const now = new Date();
+              const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const lower = raw.toLowerCase();
+              // ponytail: Urdu/Hindi terms mapped here; chrono-node handles English variants
+              const relativeMap: Record<string, number> = {
+                'tomorrow': 1, 'kal': 1, 'aane wala kal': 1,
+                'today': 0, 'aaj': 0,
+                'day after tomorrow': 2, 'parson': 2,
+                'next week': 7, 'agle hafte': 7,
+              };
+              let resolved: Date | null = null;
+              for (const [term, offset] of Object.entries(relativeMap)) {
+                if (lower === term || lower.includes(term)) {
+                  resolved = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+                  break;
+                }
+              }
+              if (!resolved) {
+                const parsed = new Date(raw);
+                if (!isNaN(parsed.getTime())) resolved = parsed;
+              }
+              if (resolved) {
+                const y = resolved.getFullYear();
+                const m = String(resolved.getMonth() + 1).padStart(2, '0');
+                const d = String(resolved.getDate()).padStart(2, '0');
                 params.appointmentDate = `${y}-${m}-${d}`;
+                console.log(`[Appointment Tool] Resolved date "${raw}" → ${params.appointmentDate}`);
+              } else {
+                console.warn(`[Appointment Tool] Could not resolve date: "${raw}"`);
               }
             }
           }

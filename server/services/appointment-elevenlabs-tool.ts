@@ -107,25 +107,16 @@ export function getBookAppointmentWebhookTool(agentId: string, callId?: string):
   const agentIdSuffix = agentId.slice(-8);
   const toolName = `book_appointment_${agentIdSuffix}`;
   
-  // Get current date for context (so AI knows what "tomorrow" means)
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentDateStr = now.toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-  
   console.log(`📅 [Appointment Tool] Creating webhook tool config for agent ${agentId}`);
   console.log(`   Tool name: ${toolName}`);
-  console.log(`   Current date context: ${currentDateStr}`);
   console.log(`   Webhook URL: ${webhookUrl.replace(secret, '[TOKEN]')}`);
-  
+
   return {
     type: "webhook",
     name: toolName,
-    description: `Book an appointment for the caller. TODAY IS ${currentDateStr}. The current year is ${currentYear}. NEVER book appointments in past years - all dates must be in ${currentYear} or later. Use this when the caller wants to schedule an appointment. When they say 'tomorrow', calculate the next day from today. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
+    // ponytail: date intentionally NOT baked in — it goes stale when ElevenLabs caches the agent config.
+    // Server resolves relative terms (tomorrow/next Monday/etc) via chrono-node at call time using server clock.
+    description: `Book an appointment for the caller. Use this when the caller wants to schedule an appointment. For appointmentDate, ALWAYS pass relative terms exactly as spoken: "tomorrow", "next Monday", "in 3 days", "December 5th" — do NOT convert to a numeric date yourself; the server resolves them accurately. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
     api_schema: {
       url: webhookUrl,
       method: "POST",
@@ -189,24 +180,15 @@ export function getAppointmentToolForAgent(elevenLabsAgentId: string): Appointme
   const agentIdSuffix = elevenLabsAgentId.slice(-8);
   const toolName = `book_appointment_${agentIdSuffix}`;
   
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentDateStr = now.toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-  
   console.log(`📅 [Appointment Tool] Creating webhook tool for ElevenLabs agent ${elevenLabsAgentId}`);
   console.log(`   Tool name: ${toolName}`);
-  console.log(`   Current date context: ${currentDateStr}`);
   console.log(`   Webhook URL: ${webhookUrl.replace(secret, '[TOKEN]')}`);
-  
+
   return {
     type: "webhook",
     name: toolName,
-    description: `Book an appointment for the caller. TODAY IS ${currentDateStr}. The current year is ${currentYear}. NEVER book appointments in past years - all dates must be in ${currentYear} or later. Use this when the caller wants to schedule an appointment. When they say 'tomorrow', calculate the next day from today. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
+    // ponytail: same as getBookAppointmentWebhookTool — no baked-in date, server resolves at call time.
+    description: `Book an appointment for the caller. Use this when the caller wants to schedule an appointment. For appointmentDate, ALWAYS pass relative terms exactly as spoken: "tomorrow", "next Monday", "in 3 days", "December 5th" — do NOT convert to a numeric date yourself; the server resolves them accurately. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
     api_schema: {
       url: webhookUrl,
       method: "POST",

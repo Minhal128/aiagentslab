@@ -175,7 +175,7 @@ export class FunctionToolBuilder {
             },
             appointmentDate: {
               type: 'string',
-              description: 'The appointment date in YYYY-MM-DD format.',
+              description: 'The appointment date. Pass relative terms exactly as spoken ("tomorrow", "next Monday", "in 3 days") or YYYY-MM-DD. Do NOT compute a numeric date yourself.',
             },
             appointmentTime: {
               type: 'string',
@@ -332,7 +332,7 @@ export class FunctionToolBuilder {
             },
             appointmentDate: {
               type: 'string',
-              description: 'The appointment date in YYYY-MM-DD format.',
+              description: 'The appointment date. Pass relative terms exactly as spoken ("tomorrow", "next Monday", "in 3 days") or YYYY-MM-DD. Do NOT compute a numeric date yourself.',
             },
             appointmentTime: {
               type: 'string',
