@@ -485,7 +485,12 @@ INSTRUCTIONS:
 3. Once you have all the necessary information, say the FULL message exactly as scripted.
 4. Once the message is delivered, you may proceed to follow any additional instructions provided below (such as calling a tool).`;
     }
-    return `### PROTOCOL: Say "${text}". Then END TURN immediately. Ignore user.`;
+    return `Deliver this message to the caller: "${text}"
+
+After delivering the message:
+- If the caller responds with a question or comment, answer it naturally and helpfully using your knowledge.
+- After answering, gently guide the conversation back toward the next step in the sales flow.
+- Do NOT ignore the caller. Do NOT go silent. Always respond to what they say.`;
   }
 
   /**
@@ -493,7 +498,10 @@ INSTRUCTIONS:
    * STRICT FORMAT: Locks agent to exact script, prevents improvisation
    */
   private createQuestionPrompt(question: string, variableName: string, nodeLabel: string): string {
-    return `Say exactly: '${question}' Then stop speaking and wait for response. Do not add anything else.`;
+    return `Ask the caller: "${question}" — then listen and wait for their response.
+
+If they ask a question instead of answering, answer it naturally and helpfully, then ask again.
+If they answer, acknowledge their response and proceed.`;
   }
 
   /**
