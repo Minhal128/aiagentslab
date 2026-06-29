@@ -22,7 +22,7 @@ import type {
 import { OPENAI_VOICES, MODEL_TIER_CONFIG } from '../types';
 import { RAGKnowledgeService } from '../../../services/rag-knowledge';
 import { db } from '../../../db';
-import { appointments, appointmentSettings, formSubmissions, agents, forms, formFields } from '@shared/schema';
+import { appointments, appointmentSettings, formSubmissions, agents, flows, forms, formFields } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { webhookDeliveryService } from '../../../services/webhook-delivery';
@@ -336,12 +336,21 @@ export class OpenAIAgentFactory {
             };
           }
           
-          // Get agent's flowId if available
+          // Get agent's flowId — only use it if the flow still exists (prevents FK violation)
           const [agent] = await db
             .select({ flowId: agents.flowId })
             .from(agents)
             .where(eq(agents.id, agentId))
             .limit(1);
+          let safeFlowId: string | null = null;
+          if (agent?.flowId) {
+            const [flowExists] = await db
+              .select({ id: flows.id })
+              .from(flows)
+              .where(eq(flows.id, agent.flowId))
+              .limit(1);
+            safeFlowId = flowExists ? agent.flowId : null;
+          }
           
           // Check user's appointment settings for overlap validation and working hours
           const [settings] = await db
@@ -493,7 +502,7 @@ export class OpenAIAgentFactory {
               id: appointmentId,
               userId,
               callId: callId || null,
-              flowId: agent?.flowId || null,
+              flowId: safeFlowId,
               contactName: params.contactName as string,
               contactPhone: params.contactPhone as string,
               contactEmail: (params.contactEmail as string) || null,
