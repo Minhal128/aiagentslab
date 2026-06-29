@@ -117,14 +117,6 @@ export class AudioBridgeService {
   private static pendingTransfers: Map<string, { targetNumber: string; callerId: string }> = new Map();
   private static readonly OPENAI_REALTIME_URL = 'wss://api.openai.com/v1/realtime';
 
-  // Map internal model aliases → real OpenAI Realtime API model IDs
-  private static readonly MODEL_ALIAS: Record<string, string> = {
-    'gpt-realtime-2':         'gpt-realtime-1.5',
-    'gpt-realtime':           'gpt-realtime-1.5',
-    'gpt-realtime-translate': 'gpt-realtime-1.5',
-    'gpt-realtime-whisper':   'gpt-realtime-1.5',
-    'gpt-realtime-mini':      'gpt-realtime-1.5',
-  };
   private static readonly INPUT_SAMPLE_RATE = 8000;  // Plivo mulaw
   private static readonly OUTPUT_SAMPLE_RATE = 24000; // OpenAI Realtime
 
@@ -225,8 +217,7 @@ export class AudioBridgeService {
       const { agentConfig, callUuid } = session;
 
       // Resolve internal model alias to real OpenAI model ID
-      const resolvedModel = this.MODEL_ALIAS[agentConfig.model] ?? agentConfig.model;
-      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${resolvedModel}`;
+      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${agentConfig.model}`;
 
       logger.info(`Connecting to OpenAI Realtime: ${agentConfig.model}`, undefined, 'AudioBridge');
 
