@@ -94,6 +94,7 @@ export interface AudioBridgeSession {
   recordingStartTime: Date | null;
   recordingActive: boolean;
   callRecordId: string | null;
+  isInterrupted: boolean;
 }
 
 /**
@@ -183,6 +184,7 @@ export class AudioBridgeService {
       recordingStartTime: null,
       recordingActive: false,
       callRecordId: params.callRecordId || null,
+      isInterrupted: false,
     };
 
     // Register tool handlers from agent config
@@ -303,9 +305,9 @@ export class AudioBridgeService {
     // Improved defaults for better call quality - less aggressive interruption
     const vadSettings = agentConfig.vadSettings || {};
     const vadType = vadSettings.type ?? 'server_vad';
-    const vadThreshold = vadSettings.threshold ?? 0.3;
-    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 200;
-    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 300;
+    const vadThreshold = vadSettings.threshold ?? 0.1;
+    const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 100;
+    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 200;
     const vadEagerness = vadSettings.eagerness ?? 'medium';
 
     logger.info(`VAD settings: type=${vadType}, threshold=${vadThreshold}, prefix=${vadPrefixPaddingMs}ms, silence=${vadSilenceDurationMs}ms`, undefined, 'AudioBridge');
@@ -502,7 +504,8 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
         case 'response.audio.delta':
         case 'response.output_audio.delta':
           // Receive audio chunk from OpenAI (PCM16 24kHz base64)
-          if (message.delta) {
+          // Drop in-flight audio if user has interrupted
+          if (message.delta && !session.isInterrupted) {
             const pcmBase64 = message.delta;
             const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 
@@ -575,13 +578,17 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
         case 'input_audio_buffer.speech_started':
           session.lastUserSpeechTime = Date.now();
           logger.info('User started speaking (barge-in detected)', undefined, 'AudioBridge');
-          // CRITICAL: Immediately cancel current response and clear audio buffer
-          // This prevents the "rushing through" behavior when user interrupts
           this.handleBargeIn(session);
           break;
 
         case 'input_audio_buffer.speech_stopped':
           logger.info('User stopped speaking', undefined, 'AudioBridge');
+          break;
+
+        case 'response.cancelled':
+          // OpenAI confirmed cancellation — re-enable audio forwarding for next response
+          session.isInterrupted = false;
+          logger.info(`Response cancelled for ${callUuid}, ready to listen`, undefined, 'AudioBridge');
           break;
 
         case 'response.function_call_arguments.done':
@@ -1099,21 +1106,15 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
       return;
     }
 
+    // Gate audio forwarding immediately so in-flight deltas don't reach Plivo
+    session.isInterrupted = true;
+
     logger.info(`Handling barge-in for ${callUuid}`, undefined, 'AudioBridge');
 
-    // 1. Cancel the current response from OpenAI
-    // This tells OpenAI to stop generating more audio/text
-    openaiWs.send(JSON.stringify({
-      type: 'response.cancel',
-    }));
+    openaiWs.send(JSON.stringify({ type: 'response.cancel' }));
 
-    // 2. Clear any queued audio that hasn't been sent yet
-    // This prevents "rushing through" already-generated audio
     if (plivoWs && plivoWs.readyState === WebSocket.OPEN && streamSid) {
-      plivoWs.send(JSON.stringify({
-        event: 'clear',
-        streamSid: streamSid,
-      }));
+      plivoWs.send(JSON.stringify({ event: 'clear', streamSid }));
       logger.info(`Cleared Plivo audio buffer for ${callUuid}`, undefined, 'AudioBridge');
     }
   }
