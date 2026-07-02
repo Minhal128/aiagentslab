@@ -158,7 +158,10 @@ export default function Campaigns() {
   });
 
   const isPro = user?.planType === "pro";
-  const campaignsWithoutPhoneNumber = campaigns.filter(c => !c.phoneNumberId && c.status !== 'completed');
+  const campaignsWithoutPhoneNumber = campaigns.filter(c =>
+    !c.phoneNumberId && !c.plivoPhoneNumberId && !c.sipPhoneNumberId &&
+    c.status !== 'completed' && c.status !== 'cancelled'
+  );
   const unassignedIds = campaignsWithoutPhoneNumber.map(c => c.id);
 
   useEffect(() => {

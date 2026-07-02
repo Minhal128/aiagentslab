@@ -41,7 +41,7 @@ import {
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth,
   isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, isToday,
-  isBefore, isAfter, startOfDay, endOfDay,
+  isBefore, isAfter, startOfDay, endOfDay, addDays, subDays, addWeeks, subWeeks,
 } from "date-fns";
 
 interface AppointmentMetadata {
@@ -698,17 +698,29 @@ export default function AppointmentsPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))} data-testid="button-prev-month">
+              <Button variant="outline" size="icon" onClick={() => {
+                if (calendarView === "day") setCurrentDate(subDays(currentDate, 1));
+                else if (calendarView === "week") setCurrentDate(subWeeks(currentDate, 1));
+                else setCurrentDate(subMonths(currentDate, 1));
+              }} data-testid="button-prev-month">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} data-testid="button-today">
                 {t("appointments.calendar.today")}
               </Button>
-              <Button variant="outline" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))} data-testid="button-next-month">
+              <Button variant="outline" size="icon" onClick={() => {
+                if (calendarView === "day") setCurrentDate(addDays(currentDate, 1));
+                else if (calendarView === "week") setCurrentDate(addWeeks(currentDate, 1));
+                else setCurrentDate(addMonths(currentDate, 1));
+              }} data-testid="button-next-month">
                 <ChevronRight className="h-4 w-4" />
               </Button>
               <h2 className="text-lg font-semibold ml-1" data-testid="text-current-month">
-                {format(currentDate, "MMMM yyyy")}
+                {calendarView === "day"
+                  ? format(currentDate, "MMMM d, yyyy")
+                  : calendarView === "week"
+                  ? `${format(startOfWeek(currentDate), "MMM d")} – ${format(endOfWeek(currentDate), "MMM d, yyyy")}`
+                  : format(currentDate, "MMMM yyyy")}
               </h2>
             </div>
             <Tabs value={calendarView} onValueChange={(v: any) => setCalendarView(v)}>
@@ -798,17 +810,92 @@ export default function AppointmentsPage() {
             </div>
           )}
 
-          {calendarView === "week" && (
-            <div className="text-center py-12 text-muted-foreground">
-              {t("appointments.calendar.weekViewSoon")}
-            </div>
-          )}
+          {calendarView === "week" && (() => {
+            const weekStart = startOfWeek(currentDate);
+            const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+            return (
+              <div className="grid grid-cols-7 gap-1">
+                {weekDays.map((day) => {
+                  const dayApts = getAppointmentsForDate(day);
+                  const isTodayDay = isToday(day);
+                  const isSelected = selectedDate && isSameDay(day, selectedDate);
+                  return (
+                    <button
+                      key={day.toISOString()}
+                      type="button"
+                      onClick={() => handleDayClick(day)}
+                      className={`min-h-32 p-2 border rounded-md text-left transition-colors cursor-pointer hover-elevate ${
+                        isTodayDay ? "border-rose-400 bg-rose-50 dark:bg-rose-950/30 dark:border-rose-700" : "border-border"
+                      } ${isSelected ? "border-primary bg-primary/10 ring-1 ring-primary" : ""}`}
+                    >
+                      <div className={`text-xs font-semibold mb-1 uppercase ${isTodayDay ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"}`}>
+                        {format(day, "EEE")}
+                      </div>
+                      <div className={`text-sm font-bold mb-2 ${isTodayDay ? "text-rose-600 dark:text-rose-400" : ""} ${isSelected ? "text-primary" : ""}`}>
+                        {format(day, "d")}
+                      </div>
+                      <div className="space-y-0.5">
+                        {dayApts.slice(0, 3).map((apt) => {
+                          const cfg = getStatusConfig(apt.status);
+                          return (
+                            <div key={apt.id} className={`text-xs px-1 py-0.5 rounded truncate ${cfg.color}`} title={`${apt.contactName} — ${format(new Date(apt.scheduledFor), "h:mm a")}`}>
+                              {format(new Date(apt.scheduledFor), "h:mm a")} {apt.contactName}
+                            </div>
+                          );
+                        })}
+                        {dayApts.length > 3 && (
+                          <div className="text-xs text-muted-foreground px-1">+{dayApts.length - 3} more</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
-          {calendarView === "day" && (
-            <div className="text-center py-12 text-muted-foreground">
-              {t("appointments.calendar.dayViewSoon")}
-            </div>
-          )}
+          {calendarView === "day" && (() => {
+            const dayApts = getAppointmentsForDate(currentDate).sort(
+              (a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
+            );
+            const hours = Array.from({ length: 15 }, (_, i) => i + 7); // 7am – 9pm
+            return (
+              <div className="space-y-0 border rounded-md overflow-hidden">
+                {hours.map((hour) => {
+                  const slotApts = dayApts.filter((a) => new Date(a.scheduledFor).getHours() === hour);
+                  const isCurrent = isToday(currentDate) && new Date().getHours() === hour;
+                  return (
+                    <div key={hour} className={`flex gap-3 min-h-12 border-b last:border-b-0 ${isCurrent ? "bg-rose-50 dark:bg-rose-950/20" : ""}`}>
+                      <div className="w-16 shrink-0 text-xs text-muted-foreground text-right pt-2 pr-3 font-medium">
+                        {format(new Date().setHours(hour, 0, 0, 0), "h a")}
+                      </div>
+                      <div className="flex-1 py-1.5 pr-2 flex flex-wrap gap-1">
+                        {slotApts.map((apt) => {
+                          const cfg = getStatusConfig(apt.status);
+                          return (
+                            <button
+                              key={apt.id}
+                              type="button"
+                              onClick={() => setUpdatingAppointment(apt)}
+                              className={`text-xs px-2 py-1 rounded-md font-medium ${cfg.color} hover:opacity-80 transition-opacity text-left`}
+                            >
+                              <div>{format(new Date(apt.scheduledFor), "h:mm a")} — {apt.contactName}</div>
+                              {apt.serviceName && <div className="opacity-70">{apt.serviceName}</div>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                {dayApts.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">
+                    No appointments on {format(currentDate, "MMMM d, yyyy")}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 

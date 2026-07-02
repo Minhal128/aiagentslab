@@ -5821,22 +5821,15 @@ function getBookAppointmentWebhookTool(agentId, callId) {
   const webhookUrl = `${domain}/api/webhooks/elevenlabs/appointment/${secret}/${agentId}${queryParams}`;
   const agentIdSuffix = agentId.slice(-8);
   const toolName = `book_appointment_${agentIdSuffix}`;
-  const now = /* @__PURE__ */ new Date();
-  const currentYear = now.getFullYear();
-  const currentDateStr = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
   console.log(`\u{1F4C5} [Appointment Tool] Creating webhook tool config for agent ${agentId}`);
   console.log(`   Tool name: ${toolName}`);
-  console.log(`   Current date context: ${currentDateStr}`);
   console.log(`   Webhook URL: ${webhookUrl.replace(secret, "[TOKEN]")}`);
   return {
     type: "webhook",
     name: toolName,
-    description: `Book an appointment for the caller. TODAY IS ${currentDateStr}. The current year is ${currentYear}. NEVER book appointments in past years - all dates must be in ${currentYear} or later. Use this when the caller wants to schedule an appointment. When they say 'tomorrow', calculate the next day from today. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
+    // ponytail: date intentionally NOT baked in — it goes stale when ElevenLabs caches the agent config.
+    // Server resolves relative terms (tomorrow/next Monday/etc) via chrono-node at call time using server clock.
+    description: `Book an appointment for the caller. Use this when the caller wants to schedule an appointment. For appointmentDate, ALWAYS pass relative terms exactly as spoken: "tomorrow", "next Monday", "in 3 days", "December 5th" \u2014 do NOT convert to a numeric date yourself; the server resolves them accurately. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
     api_schema: {
       url: webhookUrl,
       method: "POST",
@@ -5890,22 +5883,14 @@ function getAppointmentToolForAgent(elevenLabsAgentId) {
   const webhookUrl = `${domain}/api/webhooks/elevenlabs/appointment/${secret}/${elevenLabsAgentId}`;
   const agentIdSuffix = elevenLabsAgentId.slice(-8);
   const toolName = `book_appointment_${agentIdSuffix}`;
-  const now = /* @__PURE__ */ new Date();
-  const currentYear = now.getFullYear();
-  const currentDateStr = now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
   console.log(`\u{1F4C5} [Appointment Tool] Creating webhook tool for ElevenLabs agent ${elevenLabsAgentId}`);
   console.log(`   Tool name: ${toolName}`);
-  console.log(`   Current date context: ${currentDateStr}`);
   console.log(`   Webhook URL: ${webhookUrl.replace(secret, "[TOKEN]")}`);
   return {
     type: "webhook",
     name: toolName,
-    description: `Book an appointment for the caller. TODAY IS ${currentDateStr}. The current year is ${currentYear}. NEVER book appointments in past years - all dates must be in ${currentYear} or later. Use this when the caller wants to schedule an appointment. When they say 'tomorrow', calculate the next day from today. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
+    // ponytail: same as getBookAppointmentWebhookTool — no baked-in date, server resolves at call time.
+    description: `Book an appointment for the caller. Use this when the caller wants to schedule an appointment. For appointmentDate, ALWAYS pass relative terms exactly as spoken: "tomorrow", "next Monday", "in 3 days", "December 5th" \u2014 do NOT convert to a numeric date yourself; the server resolves them accurately. IMPORTANT: The caller's phone number is automatically available from the call. For contactPhone, ALWAYS set it to "{{system__caller_id}}" to use their actual calling number. Only set a different phone number if the caller explicitly provides a different one. Do NOT ask the caller for their phone number - you already have it.`,
     api_schema: {
       url: webhookUrl,
       method: "POST",
@@ -21381,7 +21366,8 @@ var init_types2 = __esm({
       { id: "verse", name: "Verse", description: "Poetic, expressive voice" },
       { id: "cedar", name: "Cedar", description: "Deep, grounded voice" },
       { id: "marin", name: "Marin", description: "Bright, cheerful voice" },
-      { id: "arjun", name: "Arjun", description: "Warm Indian tone" }
+      { id: "arjun", name: "Arjun", description: "Warm Indian tone" },
+      { id: "priya", name: "Priya", description: "Warm Indian female tone" }
     ];
     MODEL_TIER_CONFIG = {
       free: {
@@ -21426,7 +21412,7 @@ var init_openai_agent_factory = __esm({
        * Validate and normalize voice selection
        */
       static validateVoice(voice) {
-        const voiceAliasMap = { arjun: "echo" };
+        const voiceAliasMap = { arjun: "echo", priya: "shimmer" };
         const resolved = voiceAliasMap[voice] ?? voice;
         const validVoice = OPENAI_VOICES.find((v) => v.id === resolved);
         if (!validVoice) {
@@ -21573,7 +21559,8 @@ ${params.systemPrompt}`;
               },
               appointmentDate: {
                 type: "string",
-                description: "Appointment date in YYYY-MM-DD format"
+                // ponytail: no baked-in date — server resolves relative terms at call time
+                description: 'Appointment date. Pass what the caller said exactly: "tomorrow", "kal", "next Monday", "parson", "agle hafte", or a specific date. Do NOT convert to YYYY-MM-DD yourself \u2014 the server will resolve it.'
               },
               appointmentTime: {
                 type: "string",
@@ -21605,14 +21592,40 @@ ${params.systemPrompt}`;
               }
               if (params.appointmentDate) {
                 const raw = String(params.appointmentDate).trim();
-                const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                if (!isoMatch) {
-                  const parsed = new Date(raw);
-                  if (!isNaN(parsed.getTime())) {
-                    const y = parsed.getFullYear();
-                    const m = String(parsed.getMonth() + 1).padStart(2, "0");
-                    const d = String(parsed.getDate()).padStart(2, "0");
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                  const now = /* @__PURE__ */ new Date();
+                  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  const lower = raw.toLowerCase();
+                  const relativeMap = {
+                    "tomorrow": 1,
+                    "kal": 1,
+                    "aane wala kal": 1,
+                    "today": 0,
+                    "aaj": 0,
+                    "day after tomorrow": 2,
+                    "parson": 2,
+                    "next week": 7,
+                    "agle hafte": 7
+                  };
+                  let resolved = null;
+                  for (const [term, offset] of Object.entries(relativeMap)) {
+                    if (lower === term || lower.includes(term)) {
+                      resolved = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+                      break;
+                    }
+                  }
+                  if (!resolved) {
+                    const parsed = new Date(raw);
+                    if (!isNaN(parsed.getTime())) resolved = parsed;
+                  }
+                  if (resolved) {
+                    const y = resolved.getFullYear();
+                    const m = String(resolved.getMonth() + 1).padStart(2, "0");
+                    const d = String(resolved.getDate()).padStart(2, "0");
                     params.appointmentDate = `${y}-${m}-${d}`;
+                    console.log(`[Appointment Tool] Resolved date "${raw}" \u2192 ${params.appointmentDate}`);
+                  } else {
+                    console.warn(`[Appointment Tool] Could not resolve date: "${raw}"`);
                   }
                 }
               }
@@ -21645,6 +21658,11 @@ ${params.systemPrompt}`;
                 };
               }
               const [agent] = await db.select({ flowId: agents.flowId }).from(agents).where(eq27(agents.id, agentId)).limit(1);
+              let safeFlowId = null;
+              if (agent?.flowId) {
+                const [flowExists] = await db.select({ id: flows.id }).from(flows).where(eq27(flows.id, agent.flowId)).limit(1);
+                safeFlowId = flowExists ? agent.flowId : null;
+              }
               const [settings] = await db.select().from(appointmentSettings).where(eq27(appointmentSettings.userId, userId));
               const defaultWorkingHours = {
                 monday: { start: "09:00", end: "17:00", enabled: true },
@@ -21755,7 +21773,7 @@ ${params.systemPrompt}`;
                 id: appointmentId,
                 userId,
                 callId: callId || null,
-                flowId: agent?.flowId || null,
+                flowId: safeFlowId,
                 contactName: params.contactName,
                 contactPhone: params.contactPhone,
                 contactEmail: params.contactEmail || null,
@@ -23216,11 +23234,21 @@ function createAppointmentHandler(userId, agentId, callId, googleSheetId, google
       if (params.appointmentDate) {
         const raw = String(params.appointmentDate).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-          const parsed = new Date(raw);
-          if (!isNaN(parsed.getTime())) {
-            const y = parsed.getFullYear();
-            const mo = String(parsed.getMonth() + 1).padStart(2, "0");
-            const d = String(parsed.getDate()).padStart(2, "0");
+          const lower = raw.toLowerCase();
+          const now = /* @__PURE__ */ new Date();
+          let resolved = null;
+          if (lower === "tomorrow") resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+          else if (lower === "today") resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          else if (lower === "day after tomorrow") resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+          else if (lower.includes("next week")) resolved = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+          else {
+            const parsed = new Date(raw);
+            if (!isNaN(parsed.getTime())) resolved = parsed;
+          }
+          if (resolved) {
+            const y = resolved.getFullYear();
+            const mo = String(resolved.getMonth() + 1).padStart(2, "0");
+            const d = String(resolved.getDate()).padStart(2, "0");
             params.appointmentDate = `${y}-${mo}-${d}`;
           }
         }
@@ -24765,7 +24793,8 @@ var init_types3 = __esm({
       { id: "verse", name: "Verse", description: "Poetic, expressive voice" },
       { id: "cedar", name: "Cedar", description: "Deep, grounded voice" },
       { id: "marin", name: "Marin", description: "Bright, cheerful voice" },
-      { id: "arjun", name: "Arjun", description: "Warm Indian tone" }
+      { id: "arjun", name: "Arjun", description: "Warm Indian tone" },
+      { id: "priya", name: "Priya", description: "Warm Indian female tone" }
     ];
     MODEL_TIER_CONFIG2 = {
       free: {
@@ -24810,7 +24839,7 @@ var init_openai_agent_factory2 = __esm({
        * Validate and normalize voice selection
        */
       static validateVoice(voice) {
-        const voiceAliasMap = { arjun: "echo" };
+        const voiceAliasMap = { arjun: "echo", priya: "shimmer" };
         const resolved = voiceAliasMap[voice] ?? voice;
         const validVoice = OPENAI_VOICES2.find((v) => v.id === resolved);
         if (!validVoice) {
@@ -28918,7 +28947,7 @@ var init_function_tool_builder = __esm({
                 },
                 appointmentDate: {
                   type: "string",
-                  description: "The appointment date in YYYY-MM-DD format."
+                  description: 'The appointment date. Pass relative terms exactly as spoken ("tomorrow", "next Monday", "in 3 days") or YYYY-MM-DD. Do NOT compute a numeric date yourself.'
                 },
                 appointmentTime: {
                   type: "string",
@@ -29059,7 +29088,7 @@ var init_function_tool_builder = __esm({
                 },
                 appointmentDate: {
                   type: "string",
-                  description: "The appointment date in YYYY-MM-DD format."
+                  description: 'The appointment date. Pass relative terms exactly as spoken ("tomorrow", "next Monday", "in 3 days") or YYYY-MM-DD. Do NOT compute a numeric date yourself.'
                 },
                 appointmentTime: {
                   type: "string",
@@ -43476,11 +43505,7 @@ async function handleAppointmentToolWebhook(req, res) {
       console.log(`\u{1F4C5} [Appointment Webhook] Caller provided different phone: ${contactPhone} (call record: ${verifiedCallerPhone})`);
     }
     if (!finalContactPhone) {
-      console.warn(`\u{1F4C5} [Appointment Webhook] No phone number available - call not matched and AI didn't collect phone`);
-      return res.json({
-        success: false,
-        message: "I couldn't identify your phone number. Could you please provide a contact number for the appointment?"
-      });
+      console.warn(`\u{1F4C5} [Appointment Webhook] No phone number available - saving appointment with unknown phone`);
     }
     if (!appointmentDate || !appointmentTime) {
       console.warn(`\u{1F4C5} [Appointment Webhook] Missing date/time`);
@@ -43631,7 +43656,7 @@ async function handleAppointmentToolWebhook(req, res) {
       callId: validatedCallId,
       flowId: flowId || null,
       contactName: finalContactName,
-      contactPhone: finalContactPhone,
+      contactPhone: finalContactPhone || "unknown",
       contactEmail: contactEmail || null,
       appointmentDate: finalDate,
       appointmentTime: finalTime,
@@ -59695,14 +59720,22 @@ INSTRUCTIONS:
 3. Once you have all the necessary information, say the FULL message exactly as scripted.
 4. Once the message is delivered, you may proceed to follow any additional instructions provided below (such as calling a tool).`;
     }
-    return `### PROTOCOL: Say "${text2}". Then END TURN immediately. Ignore user.`;
+    return `Deliver this message to the caller: "${text2}"
+
+After delivering the message:
+- If the caller responds with a question or comment, answer it naturally and helpfully using your knowledge.
+- After answering, gently guide the conversation back toward the next step in the sales flow.
+- Do NOT ignore the caller. Do NOT go silent. Always respond to what they say.`;
   }
   /**
    * Create additional_prompt for question nodes
    * STRICT FORMAT: Locks agent to exact script, prevents improvisation
    */
   createQuestionPrompt(question, variableName, nodeLabel) {
-    return `Say exactly: '${question}' Then stop speaking and wait for response. Do not add anything else.`;
+    return `Ask the caller: "${question}" \u2014 then listen and wait for their response.
+
+If they ask a question instead of answering, answer it naturally and helpfully, then ask again.
+If they answer, acknowledge their response and proceed.`;
   }
   /**
    * Create additional_prompt for appointment scheduling nodes
@@ -62558,8 +62591,10 @@ function createAgentRoutes(ctx) {
       if (!voiceId) {
         return res.status(400).json({ error: "Voice ID is required" });
       }
+      const voiceAliasMap = { arjun: "echo", priya: "shimmer" };
+      const resolvedVoiceId = voiceAliasMap[voiceId] ?? voiceId;
       const validVoices = ["alloy", "echo", "shimmer", "ash", "ballad", "coral", "sage", "verse", "cedar", "marin"];
-      if (!validVoices.includes(voiceId)) {
+      if (!validVoices.includes(resolvedVoiceId)) {
         return res.status(400).json({ error: `Invalid voice. Must be one of: ${validVoices.join(", ")}` });
       }
       const previewText = text2 || "Hello! This is a preview of how I'll sound. I can adjust my tone and style based on your preferences.";
@@ -62579,7 +62614,7 @@ function createAgentRoutes(ctx) {
         body: JSON.stringify({
           model: "tts-1",
           input: previewText,
-          voice: voiceId,
+          voice: resolvedVoiceId,
           response_format: "mp3",
           speed: speed || 1
         })
@@ -75208,15 +75243,6 @@ var AudioBridgeService = class _AudioBridgeService {
   static activeSessions = /* @__PURE__ */ new Map();
   static pendingTransfers = /* @__PURE__ */ new Map();
   static OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime";
-  // Map internal model aliases → real OpenAI Realtime API model IDs
-  static MODEL_ALIAS = {
-    "gpt-realtime-2": "gpt-4o-realtime-preview",
-    "gpt-realtime-1.5": "gpt-4o-realtime-preview",
-    "gpt-realtime": "gpt-4o-realtime-preview",
-    "gpt-realtime-translate": "gpt-4o-realtime-preview",
-    "gpt-realtime-whisper": "gpt-4o-realtime-preview",
-    "gpt-realtime-mini": "gpt-4o-mini-realtime-preview"
-  };
   static INPUT_SAMPLE_RATE = 8e3;
   // Plivo mulaw
   static OUTPUT_SAMPLE_RATE = 24e3;
@@ -75301,8 +75327,7 @@ var AudioBridgeService = class _AudioBridgeService {
   static async connectToOpenAI(session, apiKey) {
     return new Promise((resolve3, reject) => {
       const { agentConfig, callUuid } = session;
-      const resolvedModel = this.MODEL_ALIAS[agentConfig.model] ?? agentConfig.model;
-      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${resolvedModel}`;
+      const wsUrl = `${this.OPENAI_REALTIME_URL}?model=${agentConfig.model}`;
       logger.info(`Connecting to OpenAI Realtime: ${agentConfig.model}`, void 0, "AudioBridge");
       const ws = new WebSocket5(wsUrl, {
         headers: {

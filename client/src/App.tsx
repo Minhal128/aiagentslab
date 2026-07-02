@@ -20,6 +20,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Zap, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TeamMemberSidebar } from "@/components/TeamMemberSidebar";
@@ -90,14 +91,19 @@ import { SessionTimeoutDialog } from "@/components/SessionTimeoutDialog";
 import { useActivityTimeout } from "@/hooks/useActivityTimeout";
 import { useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { PluginRegistryProvider, usePluginRegistry } from "@/contexts/plugin-registry";
+import {
+  PluginRegistryProvider,
+  usePluginRegistry,
+} from "@/contexts/plugin-registry";
 import { PluginBootstrapper } from "@/components/plugin-bootstrapper";
 import { DynamicLanguagesProvider } from "@/contexts/dynamic-languages";
 
 function PluginConversationsPage() {
   const registry = usePluginRegistry();
   const routes = registry.getRoutes();
-  const conversationRoute = routes.find(r => r.id === 'messaging-conversations');
+  const conversationRoute = routes.find(
+    (r) => r.id === "messaging-conversations",
+  );
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
@@ -112,9 +118,15 @@ function PluginConversationsPage() {
         <div className="flex flex-col items-center justify-center h-full text-center gap-4">
           <AlertTriangle className="w-10 h-10 text-amber-500" />
           <div>
-            <h3 className="text-lg font-medium mb-1" data-testid="text-conversations-error">Conversations Unavailable</h3>
+            <h3
+              className="text-lg font-medium mb-1"
+              data-testid="text-conversations-error"
+            >
+              Conversations Unavailable
+            </h3>
             <p className="text-sm text-muted-foreground max-w-md mb-4">
-              The messaging plugin could not be loaded. This may be due to a configuration issue or a temporary error.
+              The messaging plugin could not be loaded. This may be due to a
+              configuration issue or a temporary error.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -133,9 +145,15 @@ function PluginConversationsPage() {
       <div className="flex flex-col items-center justify-center h-full text-center gap-4">
         <Loader2 className="w-10 h-10 text-muted-foreground animate-spin" />
         <div>
-          <h3 className="text-lg font-medium mb-1" data-testid="text-conversations-loading">Loading Conversations</h3>
+          <h3
+            className="text-lg font-medium mb-1"
+            data-testid="text-conversations-loading"
+          >
+            Loading Conversations
+          </h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            The messaging plugin is loading. Please wait a moment or refresh the page.
+            The messaging plugin is loading. Please wait a moment or refresh the
+            page.
           </p>
         </div>
       </div>
@@ -153,23 +171,24 @@ function PluginConversationsPage() {
 
 function SessionTimeoutWrapper({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
-  
+
   const handleTimeout = useCallback(() => {
     // Logout request sends HttpOnly cookie automatically via credentials: 'include'
-    fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
+    fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
     }).catch(() => {});
     AuthStorage.clearAuth();
     queryClient.clear();
-    setLocation('/login');
+    setLocation("/login");
   }, [setLocation]);
 
-  const { isWarningVisible, remainingTime, dismissWarning } = useActivityTimeout({
-    enabled: AuthStorage.isAuthenticated(),
-    onTimeout: handleTimeout,
-    warningThresholdMs: 5 * 60 * 1000,
-  });
+  const { isWarningVisible, remainingTime, dismissWarning } =
+    useActivityTimeout({
+      enabled: AuthStorage.isAuthenticated(),
+      onTimeout: handleTimeout,
+      warningThresholdMs: 5 * 60 * 1000,
+    });
 
   return (
     <>
@@ -183,7 +202,6 @@ function SessionTimeoutWrapper({ children }: { children: React.ReactNode }) {
     </>
   );
 }
-
 
 function PublicRouter() {
   return (
@@ -226,41 +244,47 @@ function AdminRouter() {
           <AppSidebar />
           <div className="flex flex-col flex-1 overflow-hidden">
             <header className="flex items-center justify-between h-14 px-4 md:px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center gap-3">
-              <SidebarTrigger className="md:hidden" data-testid="button-mobile-menu" />
-              <div className="md:hidden">
-                {currentLogo ? (
-                  <img 
-                    src={currentLogo} 
-                    alt={branding.app_name} 
-                    className="h-7 w-auto max-w-[120px] object-contain"
-                  />
-                ) : (
-                  <Zap className="h-6 w-6 text-primary" />
-                )}
+              <div className="flex items-center gap-3">
+                <SidebarTrigger
+                  className="md:hidden"
+                  data-testid="button-mobile-menu"
+                />
+                <div className="md:hidden">
+                  {currentLogo ? (
+                    <img
+                      src={currentLogo}
+                      alt={branding.app_name}
+                      className="h-7 w-auto max-w-[120px] object-contain"
+                    />
+                  ) : (
+                    <Zap className="h-6 w-6 text-primary" />
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex-1" />
-            <div className="flex items-center gap-2">
-              <HeaderBannerNotifications />
-              <NotificationBell />
-              <LanguageSelector variant="compact" />
-              <ThemeToggle />
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto">
-            <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-              <Switch>
-                <Route path="/">
-                  <Redirect to="/admin" />
-                </Route>
-                <Route path="/admin" component={AdminDashboard} />
-                <Route path="/admin/dashboard" component={AdminDashboard} />
-                <Route path="/admin/campaigns/:id" component={AdminCampaignDetail} />
-                <Route component={NotFound} />
-              </Switch>
-            </div>
-          </main>
+              <div className="flex-1" />
+              <div className="flex items-center gap-2">
+                <HeaderBannerNotifications />
+                <NotificationBell />
+                <LanguageSelector variant="compact" />
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex-1 overflow-auto">
+              <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
+                <Switch>
+                  <Route path="/">
+                    <Redirect to="/admin" />
+                  </Route>
+                  <Route path="/admin" component={AdminDashboard} />
+                  <Route path="/admin/dashboard" component={AdminDashboard} />
+                  <Route
+                    path="/admin/campaigns/:id"
+                    component={AdminCampaignDetail}
+                  />
+                  <Route component={NotFound} />
+                </Switch>
+              </div>
+            </main>
           </div>
         </div>
       </div>
@@ -282,12 +306,15 @@ function UserRouter() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between h-14 px-4 md:px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="md:hidden" data-testid="button-mobile-menu" />
+              <SidebarTrigger
+                className="md:hidden"
+                data-testid="button-mobile-menu"
+              />
               <div className="md:hidden">
                 {currentLogo ? (
-                  <img 
-                    src={currentLogo} 
-                    alt={branding.app_name} 
+                  <img
+                    src={currentLogo}
+                    alt={branding.app_name}
                     className="h-7 w-auto max-w-[120px] object-contain"
                   />
                 ) : (
@@ -327,30 +354,66 @@ function UserRouter() {
                 <Route path="/app/upgrade">
                   <Redirect to="/app/billing?tab=plans" />
                 </Route>
-                <Route path="/app/knowledge-base" component={KnowledgeBase} />
+                <Route path="/app/knowledge-base">
+                  <ErrorBoundary>
+                    <KnowledgeBase />
+                  </ErrorBoundary>
+                </Route>
                 <Route path="/app/agents" component={Agents} />
-                <Route path="/app/conversations" component={PluginConversationsPage} />
-                <Route path="/app/prompt-templates" component={PromptTemplates} />
-                <Route path="/app/incoming-connections" component={IncomingConnections} />
+                <Route
+                  path="/app/conversations"
+                  component={PluginConversationsPage}
+                />
+                <Route
+                  path="/app/prompt-templates"
+                  component={PromptTemplates}
+                />
+                <Route
+                  path="/app/incoming-connections"
+                  component={IncomingConnections}
+                />
                 <Route path="/app/voices" component={Voices} />
                 <Route path="/app/phone-numbers" component={PhoneNumbers} />
-                <Route path="/app/google-callback" component={GoogleCallbackPage} />
+                <Route
+                  path="/app/google-callback"
+                  component={GoogleCallbackPage}
+                />
                 <Route path="/app/tools" component={ToolsPage} />
                 <Route path="/app/flows/new" component={FlowBuilderPage} />
                 <Route path="/app/flows/execution">
                   <Redirect to="/app/flows?tab=execution" />
                 </Route>
-                <Route path="/app/flows/webhooks" component={WebhookConfigPage} />
+                <Route
+                  path="/app/flows/webhooks"
+                  component={WebhookConfigPage}
+                />
                 <Route path="/app/flows/forms" component={FormsPage} />
-                <Route path="/app/flows/appointments" component={AppointmentsPage} />
+                <Route
+                  path="/app/flows/appointments"
+                  component={AppointmentsPage}
+                />
                 <Route path="/app/flows/templates">
                   <Redirect to="/app/flows?tab=templates" />
                 </Route>
                 <Route path="/app/flows/:id" component={FlowBuilderPage} />
                 <Route path="/app/flows" component={FlowsPage} />
-                <Route path="/app/outbound" component={() => <div className="text-center py-16 text-muted-foreground">Outbound page coming soon</div>} />
+                <Route
+                  path="/app/outbound"
+                  component={() => (
+                    <div className="text-center py-16 text-muted-foreground">
+                      Outbound page coming soon
+                    </div>
+                  )}
+                />
                 <Route path="/app/settings" component={Settings} />
-                <Route path="/app/developers" component={() => <div className="text-center py-16 text-muted-foreground">Developers page coming soon</div>} />
+                <Route
+                  path="/app/developers"
+                  component={() => (
+                    <div className="text-center py-16 text-muted-foreground">
+                      Developers page coming soon
+                    </div>
+                  )}
+                />
                 <Route component={NotFound} />
               </Switch>
             </div>
@@ -375,12 +438,15 @@ function TeamMemberRouter() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between h-14 px-4 md:px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="md:hidden" data-testid="button-mobile-menu" />
+              <SidebarTrigger
+                className="md:hidden"
+                data-testid="button-mobile-menu"
+              />
               <div className="md:hidden">
                 {currentLogo ? (
-                  <img 
-                    src={currentLogo} 
-                    alt={branding.app_name} 
+                  <img
+                    src={currentLogo}
+                    alt={branding.app_name}
                     className="h-7 w-auto max-w-[120px] object-contain"
                   />
                 ) : (
@@ -418,20 +484,39 @@ function TeamMemberRouter() {
                 <Route path="/app/upgrade">
                   <Redirect to="/app/billing?tab=plans" />
                 </Route>
-                <Route path="/app/knowledge-base" component={KnowledgeBase} />
+                <Route path="/app/knowledge-base">
+                  <ErrorBoundary>
+                    <KnowledgeBase />
+                  </ErrorBoundary>
+                </Route>
                 <Route path="/app/agents" component={Agents} />
-                <Route path="/app/conversations" component={PluginConversationsPage} />
-                <Route path="/app/prompt-templates" component={PromptTemplates} />
-                <Route path="/app/incoming-connections" component={IncomingConnections} />
+                <Route
+                  path="/app/conversations"
+                  component={PluginConversationsPage}
+                />
+                <Route
+                  path="/app/prompt-templates"
+                  component={PromptTemplates}
+                />
+                <Route
+                  path="/app/incoming-connections"
+                  component={IncomingConnections}
+                />
                 <Route path="/app/voices" component={Voices} />
                 <Route path="/app/phone-numbers" component={PhoneNumbers} />
                 <Route path="/app/flows/new" component={FlowBuilderPage} />
                 <Route path="/app/flows/execution">
                   <Redirect to="/app/flows?tab=execution" />
                 </Route>
-                <Route path="/app/flows/webhooks" component={WebhookConfigPage} />
+                <Route
+                  path="/app/flows/webhooks"
+                  component={WebhookConfigPage}
+                />
                 <Route path="/app/flows/forms" component={FormsPage} />
-                <Route path="/app/flows/appointments" component={AppointmentsPage} />
+                <Route
+                  path="/app/flows/appointments"
+                  component={AppointmentsPage}
+                />
                 <Route path="/app/flows/templates">
                   <Redirect to="/app/flows?tab=templates" />
                 </Route>
@@ -463,12 +548,15 @@ function AdminTeamMemberRouter() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between h-14 px-4 md:px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-3">
-              <SidebarTrigger className="md:hidden" data-testid="button-mobile-menu" />
+              <SidebarTrigger
+                className="md:hidden"
+                data-testid="button-mobile-menu"
+              />
               <div className="md:hidden">
                 {currentLogo ? (
-                  <img 
-                    src={currentLogo} 
-                    alt={branding.app_name} 
+                  <img
+                    src={currentLogo}
+                    alt={branding.app_name}
                     className="h-7 w-auto max-w-[120px] object-contain"
                   />
                 ) : (
@@ -490,7 +578,10 @@ function AdminTeamMemberRouter() {
                 </Route>
                 <Route path="/admin" component={AdminDashboard} />
                 <Route path="/admin/dashboard" component={AdminDashboard} />
-                <Route path="/admin/campaigns/:id" component={AdminCampaignDetail} />
+                <Route
+                  path="/admin/campaigns/:id"
+                  component={AdminCampaignDetail}
+                />
                 <Route component={NotFound} />
               </Switch>
             </div>
@@ -511,7 +602,11 @@ interface User {
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
   // Fetch user from server to validate admin access
-  const { data: user, isLoading: userLoading, isError } = useQuery<User>({
+  const {
+    data: user,
+    isLoading: userLoading,
+    isError,
+  } = useQuery<User>({
     queryKey: ["/api/auth/me"],
     retry: false,
   });
@@ -539,11 +634,13 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
     return <Redirect to="/login" />;
   }
 
-  const hasAdminAccess = user.role === 'admin';
-  
+  const hasAdminAccess = user.role === "admin";
+
   // If user doesn't have admin access, redirect to user panel
   if (!hasAdminAccess) {
-    console.log("AdminGuard - User is not authorized for admin panel, redirecting to /app");
+    console.log(
+      "AdminGuard - User is not authorized for admin panel, redirecting to /app",
+    );
     return <Redirect to="/app" />;
   }
 
@@ -563,10 +660,14 @@ interface AdminTeamMemberInfo {
 
 function AdminTeamGuard({ children }: { children: React.ReactNode }) {
   // Validate admin team member JWT token via server
-  const { data: authData, isLoading, isError } = useQuery<{ 
-    member: AdminTeamMemberInfo; 
-    team: { id: string; name: string }; 
-    permissions: Record<string, Record<string, any>> 
+  const {
+    data: authData,
+    isLoading,
+    isError,
+  } = useQuery<{
+    member: AdminTeamMemberInfo;
+    team: { id: string; name: string };
+    permissions: Record<string, Record<string, any>>;
   }>({
     queryKey: ["/api/admin/team/auth/me"],
     queryFn: async () => {
@@ -600,29 +701,41 @@ function AdminTeamGuard({ children }: { children: React.ReactNode }) {
 
   // If no auth data, redirect to admin team login
   if (!authData || !authData.member) {
-    console.log("AdminTeamGuard - No valid session, redirecting to /admin/team/login");
+    console.log(
+      "AdminTeamGuard - No valid session, redirecting to /admin/team/login",
+    );
     TeamAuth.clearAuth();
     return <Redirect to="/admin/team/login" />;
   }
 
   // Check member status
-  if (authData.member.status !== 'active') {
-    console.log("AdminTeamGuard - Member not active, redirecting to /admin/team/login");
+  if (authData.member.status !== "active") {
+    console.log(
+      "AdminTeamGuard - Member not active, redirecting to /admin/team/login",
+    );
     TeamAuth.clearAuth();
     return <Redirect to="/admin/team/login" />;
   }
 
-  console.log("AdminTeamGuard - Admin team member validated, rendering admin panel");
+  console.log(
+    "AdminTeamGuard - Admin team member validated, rendering admin panel",
+  );
   return <>{children}</>;
 }
 
 function UserGuard({ children }: { children: React.ReactNode }) {
-  const [isTeamMember, setIsTeamMember] = useState(() => TeamAuth.isAuthenticated());
+  const [isTeamMember, setIsTeamMember] = useState(() =>
+    TeamAuth.isAuthenticated(),
+  );
   const [teamAuthValid, setTeamAuthValid] = useState<boolean | null>(null);
   const [teamAuthLoading, setTeamAuthLoading] = useState(isTeamMember);
 
   // Fetch user from server (for regular users)
-  const { data: user, isLoading, isError } = useQuery<User>({
+  const {
+    data: user,
+    isLoading,
+    isError,
+  } = useQuery<User>({
     queryKey: ["/api/auth/me"],
     retry: false,
     enabled: !isTeamMember, // Only fetch for non-team-members
@@ -632,7 +745,7 @@ function UserGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isTeamMember) {
       setTeamAuthLoading(true);
-      TeamAuth.validateSession().then(result => {
+      TeamAuth.validateSession().then((result) => {
         setTeamAuthValid(result.valid);
         setTeamAuthLoading(false);
         if (!result.valid) {
@@ -680,11 +793,15 @@ function Router() {
   const [location] = useLocation();
   // Initialize auth state synchronously from localStorage to prevent flash
   // Check both regular user auth AND team member auth
-  const [isAuthenticated, setIsAuthenticated] = useState(() => 
-    AuthStorage.isAuthenticated() || TeamAuth.isAuthenticated()
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => AuthStorage.isAuthenticated() || TeamAuth.isAuthenticated(),
   );
-  const [isTeamMember, setIsTeamMember] = useState(() => TeamAuth.isAuthenticated());
-  const [isAdminTeamMember, setIsAdminTeamMember] = useState(() => TeamAuth.isAdminTeamMember());
+  const [isTeamMember, setIsTeamMember] = useState(() =>
+    TeamAuth.isAuthenticated(),
+  );
+  const [isAdminTeamMember, setIsAdminTeamMember] = useState(() =>
+    TeamAuth.isAdminTeamMember(),
+  );
   const [isChecking, setIsChecking] = useState(true);
 
   // Check installation status
@@ -709,8 +826,14 @@ function Router() {
   useEffect(() => {
     console.log("Router - Current location:", location);
     console.log("Router - isAuthenticated:", isAuthenticated);
-    console.log("Router - location.startsWith('/admin'):", location.startsWith('/admin'));
-    console.log("Router - location.startsWith('/app'):", location.startsWith('/app'));
+    console.log(
+      "Router - location.startsWith('/admin'):",
+      location.startsWith("/admin"),
+    );
+    console.log(
+      "Router - location.startsWith('/app'):",
+      location.startsWith("/app"),
+    );
   }, [location, isAuthenticated]);
 
   if (isChecking) {
@@ -722,62 +845,79 @@ function Router() {
   }
 
   // Installation check - if not installed, redirect to installer unless already on /install
-  if (installStatus && !installStatus.installed && location !== '/install') {
+  if (installStatus && !installStatus.installed && location !== "/install") {
     console.log("Router - Not installed, redirecting to /install");
     return <Redirect to="/install" />;
   }
 
   // Block installer if already installed
-  if (location === '/install' && installStatus?.installed) {
+  if (location === "/install" && installStatus?.installed) {
     console.log("Router - Already installed, redirecting to /login");
     return <Redirect to="/login" />;
   }
 
   // Installer route (public, no auth required)
-  if (location === '/install') {
+  if (location === "/install") {
     console.log("Router - Rendering InstallWizard");
     return <InstallWizard />;
   }
 
   // Redirect authenticated users away from login/register immediately
   // This prevents the flash when page reloads after login
-  if (isAuthenticated && (location === '/login' || location === '/register')) {
+  if (isAuthenticated && (location === "/login" || location === "/register")) {
     // Admin team members go to /admin
     if (isAdminTeamMember) {
-      console.log("Router - Authenticated admin team member on auth page, redirecting to /admin");
+      console.log(
+        "Router - Authenticated admin team member on auth page, redirecting to /admin",
+      );
       return <Redirect to="/admin" />;
     }
     // User team members go to /app
     if (isTeamMember) {
-      console.log("Router - Authenticated team member on auth page, redirecting to /app");
+      console.log(
+        "Router - Authenticated team member on auth page, redirecting to /app",
+      );
       return <Redirect to="/app" />;
     }
     const user = AuthStorage.getUser();
-    const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-    const redirectTo = isAdmin ? '/admin' : '/app';
-    console.log("Router - Authenticated user on auth page, redirecting to", redirectTo);
+    const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+    const redirectTo = isAdmin ? "/admin" : "/app";
+    console.log(
+      "Router - Authenticated user on auth page, redirecting to",
+      redirectTo,
+    );
     return <Redirect to={redirectTo} />;
   }
 
   // Redirect authenticated team members away from team login page
-  if (isTeamMember && location === '/team/login') {
-    const redirectTo = isAdminTeamMember ? '/admin' : '/app';
-    console.log("Router - Authenticated team member on team login page, redirecting to", redirectTo);
+  if (isTeamMember && location === "/team/login") {
+    const redirectTo = isAdminTeamMember ? "/admin" : "/app";
+    console.log(
+      "Router - Authenticated team member on team login page, redirecting to",
+      redirectTo,
+    );
     return <Redirect to={redirectTo} />;
   }
 
   // Redirect authenticated admin team members away from admin team login page
-  if (isAdminTeamMember && location === '/admin/team/login') {
-    console.log("Router - Authenticated admin team member on admin team login page, redirecting to /admin");
+  if (isAdminTeamMember && location === "/admin/team/login") {
+    console.log(
+      "Router - Authenticated admin team member on admin team login page, redirecting to /admin",
+    );
     return <Redirect to="/admin" />;
   }
 
   // Admin routes - protected by server-side validation
   // Check this BEFORE public routes to prevent flash during login transition
-  if (location.startsWith('/admin') && !location.startsWith('/admin/team/login')) {
+  if (
+    location.startsWith("/admin") &&
+    !location.startsWith("/admin/team/login")
+  ) {
     // Admin team members get the AdminTeamGuard + AdminTeamMemberRouter with permission-based sidebar
     if (isAdminTeamMember) {
-      console.log("Router - Rendering AdminTeamGuard + AdminTeamMemberRouter (admin team member)");
+      console.log(
+        "Router - Rendering AdminTeamGuard + AdminTeamMemberRouter (admin team member)",
+      );
       return (
         <AdminTeamGuard>
           <AdminTeamMemberRouter />
@@ -794,10 +934,12 @@ function Router() {
 
   // User routes (/app) - protected by server-side validation
   // Check this BEFORE public routes to prevent flash during login transition
-  if (location.startsWith('/app')) {
+  if (location.startsWith("/app")) {
     // Team members get the TeamMemberRouter with permission-based sidebar
     if (isTeamMember) {
-      console.log("Router - Rendering UserGuard + TeamMemberRouter (team member)");
+      console.log(
+        "Router - Rendering UserGuard + TeamMemberRouter (team member)",
+      );
       return (
         <UserGuard>
           <TeamMemberRouter />

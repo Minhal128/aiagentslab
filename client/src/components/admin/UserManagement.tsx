@@ -899,22 +899,24 @@ export default function UserManagement() {
               <AlertTriangle className="h-5 w-5 text-destructive" />
               Delete User Permanently
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                Are you sure you want to permanently delete <strong>{selectedUser?.name}</strong> ({selectedUser?.email})?
-              </p>
-              <p className="text-destructive font-medium">
-                This action cannot be undone. All associated data will be permanently removed:
-              </p>
-              <ul className="list-disc list-inside text-sm space-y-1 ml-2">
-                <li>Agents and voice configurations</li>
-                <li>Campaigns and contacts</li>
-                <li>Call history and recordings</li>
-                <li>Flows and automations</li>
-                <li>Knowledge base documents</li>
-                <li>Subscriptions and credit history</li>
-                <li>All other user data</li>
-              </ul>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <span className="block">
+                  Are you sure you want to permanently delete <strong>{selectedUser?.name}</strong> ({selectedUser?.email})?
+                </span>
+                <span className="block text-destructive font-medium">
+                  This action cannot be undone. All associated data will be permanently removed:
+                </span>
+                <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                  <li>Agents and voice configurations</li>
+                  <li>Campaigns and contacts</li>
+                  <li>Call history and recordings</li>
+                  <li>Flows and automations</li>
+                  <li>Knowledge base documents</li>
+                  <li>Subscriptions and credit history</li>
+                  <li>All other user data</li>
+                </ul>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

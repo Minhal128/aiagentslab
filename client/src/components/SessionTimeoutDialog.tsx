@@ -39,15 +39,15 @@ export function SessionTimeoutDialog({
             Session About to Expire
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
-            <p>
+            <span className="block">
               Your session will expire due to inactivity.
-            </p>
-            <p className="text-lg font-semibold text-foreground">
+            </span>
+            <span className="block text-lg font-semibold text-foreground">
               Time remaining: {formatTime(remainingTime)}
-            </p>
-            <p>
+            </span>
+            <span className="block">
               Click "Stay Logged In" to continue your session, or "Log Out" to end your session now.
-            </p>
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

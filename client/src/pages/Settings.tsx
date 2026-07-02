@@ -689,26 +689,28 @@ export default function Settings() {
                             <AlertTriangle className="h-5 w-5" />
                             <AlertDialogTitle>{t('settings.confirmDeleteAccount')}</AlertDialogTitle>
                           </div>
-                          <AlertDialogDescription className="space-y-3">
-                            <p>{t('settings.deleteAccountConfirmMessage')}</p>
-                            <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
-                              <p className="text-sm font-medium text-destructive">{t('settings.deleteAccountConsequences')}</p>
-                              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                                <li>{t('settings.deleteConsequence1')}</li>
-                                <li>{t('settings.deleteConsequence2')}</li>
-                                <li>{t('settings.deleteConsequence3')}</li>
-                              </ul>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="delete-password">{t('settings.enterPasswordToConfirm')}</Label>
-                              <Input
-                                id="delete-password"
-                                type="password"
-                                placeholder={t('settings.yourPassword')}
-                                value={deletePassword}
-                                onChange={(e) => setDeletePassword(e.target.value)}
-                                data-testid="input-delete-password"
-                              />
+                          <AlertDialogDescription asChild>
+                            <div className="space-y-3">
+                              <span className="block">{t('settings.deleteAccountConfirmMessage')}</span>
+                              <div className="p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                                <span className="block text-sm font-medium text-destructive">{t('settings.deleteAccountConsequences')}</span>
+                                <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                                  <li>{t('settings.deleteConsequence1')}</li>
+                                  <li>{t('settings.deleteConsequence2')}</li>
+                                  <li>{t('settings.deleteConsequence3')}</li>
+                                </ul>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="delete-password">{t('settings.enterPasswordToConfirm')}</Label>
+                                <Input
+                                  id="delete-password"
+                                  type="password"
+                                  placeholder={t('settings.yourPassword')}
+                                  value={deletePassword}
+                                  onChange={(e) => setDeletePassword(e.target.value)}
+                                  data-testid="input-delete-password"
+                                />
+                              </div>
                             </div>
                           </AlertDialogDescription>
                         </AlertDialogHeader>
