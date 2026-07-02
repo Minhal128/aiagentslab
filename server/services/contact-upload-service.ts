@@ -103,21 +103,56 @@ export class ContactUploadService {
    * ```
    */
   parseContactsFromCSV(fileContent: string, campaignId: string): ParsedContact[] {
-    const parsed = Papa.parse(fileContent, {
-      header: true,
-      skipEmptyLines: true,
-    });
+    // Probe row 1 to tell a real header row apart from a headerless data file
+    // (e.g. raw phone-list exports where row 1 is already a lead, not column names).
+    const probe = Papa.parse<string[]>(fileContent, { header: false, skipEmptyLines: true });
+    const rows = (probe.data as string[][]) || [];
+    const firstRow = rows[0] || [];
+    const hasHeader = firstRow.some((cell) =>
+      STANDARD_FIELD_NAMES.some((f) => f.toLowerCase() === String(cell).trim().toLowerCase())
+    );
 
-    if (parsed.errors?.length) {
-      const sample = parsed.errors.slice(0, 5).map((e) => e.message).join("; ");
-      console.warn(
-        `[Contact Upload] CSV parse reported ${parsed.errors.length} issue(s). First: ${sample}`
-      );
+    if (hasHeader) {
+      const parsed = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+      });
+
+      if (parsed.errors?.length) {
+        const sample = parsed.errors.slice(0, 5).map((e) => e.message).join("; ");
+        console.warn(
+          `[Contact Upload] CSV parse reported ${parsed.errors.length} issue(s). First: ${sample}`
+        );
+      }
+
+      return (parsed.data as Record<string, unknown>[]).map((row) => {
+        return this.parseContactRow(row as Record<string, any>, campaignId);
+      });
     }
 
-    return (parsed.data as Record<string, unknown>[]).map((row) => {
-      return this.parseContactRow(row as Record<string, any>, campaignId);
+    // No header: sniff which columns hold a phone number / email by content instead of by name.
+    const phoneCol = this.sniffColumn(rows, (v) => /^\+?\d[\d\s-]{6,17}$/.test(v.trim()));
+    const emailCol = this.sniffColumn(rows, (v) => /^\S+@\S+\.\S+$/.test(v.trim()));
+    const nameCol = firstRow.findIndex((_, i) => i !== phoneCol && i !== emailCol);
+
+    return rows.map((cells) => {
+      const row: Record<string, any> = {
+        phone: phoneCol >= 0 ? cells[phoneCol] : "",
+        name: nameCol >= 0 ? cells[nameCol] : "",
+        email: emailCol >= 0 ? cells[emailCol] : "",
+      };
+      return this.parseContactRow(row, campaignId);
     });
+  }
+
+  /** Finds the column index where most values match `test`, or -1 if none does. */
+  private sniffColumn(rows: string[][], test: (v: string) => boolean): number {
+    const colCount = rows[0]?.length ?? 0;
+    for (let c = 0; c < colCount; c++) {
+      const hits = rows.filter((r) => test(String(r[c] ?? ""))).length;
+      if (hits / rows.length > 0.5) return c;
+    }
+    return -1;
   }
 
   /**
