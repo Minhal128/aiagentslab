@@ -571,6 +571,141 @@ export class OpenAIAgentFactory {
   }
 
   /**
+   * Add availability-check tool to agent
+   * Looks up working hours + existing bookings to return open slots for a date
+   */
+  static addAvailabilityTool(
+    config: AgentConfigWithContext,
+    userId: string,
+  ): AgentConfigWithContext {
+    if (config.tools?.some(t => t.name === 'check_availability' && t.handler)) {
+      return config;
+    }
+
+    const availabilityTool: AgentTool = {
+      name: 'check_availability',
+      description: 'Check which appointment time slots are open on a given date. Call this BEFORE confirming a specific time with the caller, then offer them a couple of the open slots to choose from.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: {
+            type: 'string',
+            description: 'The date to check, exactly as the caller said it: "tomorrow", "kal", "5 July", "next Monday", etc, or YYYY-MM-DD.',
+          },
+        },
+        required: ['date'],
+      },
+      handler: async (params: Record<string, unknown>) => {
+        try {
+          const raw = String(params.date || '').trim();
+          let resolvedDate = raw;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const lower = raw.toLowerCase();
+            const relativeMap: Record<string, number> = {
+              'tomorrow': 1, 'kal': 1, 'aane wala kal': 1,
+              'today': 0, 'aaj': 0,
+              'day after tomorrow': 2, 'parson': 2,
+              'next week': 7, 'agle hafte': 7,
+            };
+            let resolved: Date | null = null;
+            for (const [term, offset] of Object.entries(relativeMap)) {
+              if (lower === term || lower.includes(term)) {
+                resolved = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
+                break;
+              }
+            }
+            if (!resolved) {
+              const parsed = new Date(raw);
+              if (!isNaN(parsed.getTime())) resolved = parsed;
+            }
+            if (resolved) {
+              const y = resolved.getFullYear();
+              const m = String(resolved.getMonth() + 1).padStart(2, '0');
+              const d = String(resolved.getDate()).padStart(2, '0');
+              resolvedDate = `${y}-${m}-${d}`;
+            }
+          }
+
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(resolvedDate)) {
+            return { success: false, message: 'Could not understand that date. Ask the caller for a clearer date.' };
+          }
+
+          const [settings] = await db.select().from(appointmentSettings).where(eq(appointmentSettings.userId, userId));
+
+          const defaultWorkingHours: Record<string, { start: string; end: string; enabled: boolean }> = {
+            monday: { start: "09:00", end: "17:00", enabled: true },
+            tuesday: { start: "09:00", end: "17:00", enabled: true },
+            wednesday: { start: "09:00", end: "17:00", enabled: true },
+            thursday: { start: "09:00", end: "17:00", enabled: true },
+            friday: { start: "09:00", end: "17:00", enabled: true },
+            saturday: { start: "09:00", end: "17:00", enabled: false },
+            sunday: { start: "09:00", end: "17:00", enabled: false },
+          };
+
+          const parsedDate = new Date(resolvedDate + 'T12:00:00');
+          const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+          const dayName = dayNames[parsedDate.getDay()];
+          const userWorkingHours = settings?.workingHours as Record<string, { start: string; end: string; enabled: boolean }> | undefined;
+          const daySettings = userWorkingHours?.[dayName]
+            ? { ...defaultWorkingHours[dayName], ...userWorkingHours[dayName] }
+            : defaultWorkingHours[dayName];
+
+          if (!daySettings?.enabled) {
+            const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+            return { success: true, date: resolvedDate, availableSlots: [], message: `We're closed on ${capitalizedDay}s. Ask the caller to pick a different day.` };
+          }
+
+          const slotMinutes = 30;
+          const parseTimeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + (m || 0); };
+          const startMinutes = parseTimeToMinutes(daySettings.start || '09:00');
+          const endMinutes = parseTimeToMinutes(daySettings.end || '17:00');
+
+          const booked = await db.select({ appointmentTime: appointments.appointmentTime })
+            .from(appointments)
+            .where(and(
+              eq(appointments.userId, userId),
+              eq(appointments.appointmentDate, resolvedDate),
+              eq(appointments.status, 'scheduled')
+            ));
+          const bookedTimes = new Set(booked.map(b => b.appointmentTime));
+
+          const openSlots: string[] = [];
+          for (let m = startMinutes; m + slotMinutes <= endMinutes; m += slotMinutes) {
+            const h = String(Math.floor(m / 60)).padStart(2, '0');
+            const min = String(m % 60).padStart(2, '0');
+            const slot = `${h}:${min}`;
+            if (!bookedTimes.has(slot)) openSlots.push(slot);
+          }
+
+          if (openSlots.length === 0) {
+            return { success: true, date: resolvedDate, availableSlots: [], message: `No open slots on ${resolvedDate}. Ask the caller to pick a different day.` };
+          }
+
+          return {
+            success: true,
+            date: resolvedDate,
+            availableSlots: openSlots,
+            message: `Open slots on ${resolvedDate}: ${openSlots.slice(0, 6).join(', ')}${openSlots.length > 6 ? ', and more' : ''}.`,
+          };
+        } catch (error: any) {
+          console.error(`[Availability Tool] Error: ${error.message}`);
+          return { success: false, message: 'Unable to check availability right now.' };
+        }
+      },
+    };
+
+    const availabilityPromptAddition = `\n\nAVAILABILITY CHECK RULE: Before confirming a specific date/time, call check_availability with the date the caller mentioned. Offer 2-3 of the returned open slots for them to pick from. Only call book_appointment after they pick one of the open slots.`;
+
+    return {
+      ...config,
+      systemPrompt: (config.systemPrompt || '') + availabilityPromptAddition,
+      tools: [...(config.tools?.filter(t => t.name !== 'check_availability') || []), availabilityTool],
+    };
+  }
+
+  /**
    * Add form submission tool to agent
    * Submits collected data to form submission table
    */

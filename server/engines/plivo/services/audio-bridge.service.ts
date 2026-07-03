@@ -305,7 +305,9 @@ export class AudioBridgeService {
     const vadType = vadSettings.type ?? 'server_vad';
     const vadThreshold = vadSettings.threshold ?? 0.3;
     const vadPrefixPaddingMs = vadSettings.prefixPaddingMs ?? 200;
-    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 300;
+    // ponytail: 1000ms gives the caller a full second of silence before the agent
+    // replies, instead of jumping in after a brief pause mid-sentence.
+    const vadSilenceDurationMs = vadSettings.silenceDurationMs ?? 1000;
     const vadEagerness = vadSettings.eagerness ?? 'medium';
 
     logger.info(`VAD settings: type=${vadType}, threshold=${vadThreshold}, prefix=${vadPrefixPaddingMs}ms, silence=${vadSilenceDurationMs}ms`, undefined, 'AudioBridge');
@@ -337,10 +339,11 @@ STRICT CONVERSATION RULES — ALWAYS FOLLOW:
 5. Do NOT keep redirecting to the same person or action repeatedly. Once you have mentioned something, move on.
 
 BOOKING RULE — CRITICAL:
-- When the caller agrees to a date and time, call book_appointment IMMEDIATELY. Do not say "I am booking" — just call the tool silently and then confirm once it succeeds.
-- contactPhone is auto-filled from the caller's number. You do NOT need to ask for it.
+- Before confirming a specific date/time, call check_availability with the date the caller mentioned and offer 2-3 of the open slots it returns.
+- Once the caller picks an open slot, call book_appointment IMMEDIATELY. Do not say "I am booking" — just call the tool silently and then confirm once it succeeds.
+- contactPhone is auto-filled from the caller's number. You do NOT need to ask for it, ever.
 - contactName defaults to "Customer" if unknown. Do NOT block the booking waiting for a name.
-- Only ask for date and time. That is all you need.
+- Never ask the same question twice or restate information the caller already gave you — track what you already have and move straight to the next missing piece, or call the tool.
 
 TOOL RULES:
 - submit_form: call it immediately when form data is collected. Do NOT say you submitted without calling it.

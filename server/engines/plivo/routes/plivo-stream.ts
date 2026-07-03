@@ -654,6 +654,7 @@ async function initializeSession(
               call.id,
               appointmentCallerPhone || undefined
             );
+            config = OpenAIAgentFactory.addAvailabilityTool(config, agent.userId);
           }
 
           // Add transfer tool if configured
@@ -734,8 +735,9 @@ async function initializeSession(
         call.id,
         callerPhone || undefined
       );
+      safetyConfig = OpenAIAgentFactory.addAvailabilityTool(safetyConfig, call.userId || '');
       agentConfig.tools = safetyConfig.tools;
-      logger.info(`[PlivoStream] Auto-added book_appointment handler (system prompt references it but tool was missing)`, undefined, 'PlivoStream');
+      logger.info(`[PlivoStream] Auto-added book_appointment + check_availability handlers (system prompt references booking but tools were missing)`, undefined, 'PlivoStream');
     }
 
     // Get Plivo credential ID from metadata for transfer functionality
