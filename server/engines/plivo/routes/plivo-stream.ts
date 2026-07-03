@@ -736,7 +736,7 @@ async function initializeSession(
         callerPhone || undefined
       );
       safetyConfig = OpenAIAgentFactory.addAvailabilityTool(safetyConfig, call.userId || '');
-      agentConfig.tools = safetyConfig.tools;
+      agentConfig.tools = safetyConfig.tools || [];
       logger.info(`[PlivoStream] Auto-added book_appointment + check_availability handlers (system prompt references booking but tools were missing)`, undefined, 'PlivoStream');
     }
 
