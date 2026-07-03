@@ -79,7 +79,7 @@ fi
 # --- build --------------------------------------------------------------
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
     echo "[3/5] npm run build"
-    NODE_ENV=production npm run build
+    NODE_ENV=production NODE_OPTIONS="--max-old-space-size=4096" npm run build
     echo ""
 fi
 
