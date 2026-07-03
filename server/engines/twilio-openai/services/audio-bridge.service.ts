@@ -260,22 +260,27 @@ ERROR HANDLING — MANDATORY:
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
-    // Correct OpenAI Realtime API session.update format.
-    // All fields must be at the TOP LEVEL of session — NOT nested under any 'audio' object.
-    // The previous nested audio.input/audio.output structure was invalid and ignored by OpenAI.
+    // GA Realtime API format: session.type is required, audio config is nested
+    // under audio.input/audio.output, and temperature is no longer supported.
     const sessionConfig = {
       type: 'session.update',
       session: {
-        modalities: ['text', 'audio'],
+        type: 'realtime',
+        output_modalities: ['audio'],
         instructions: enhancedInstructions,
-        voice: agentConfig.voice,
-        input_audio_format: 'g711_ulaw',
-        output_audio_format: 'g711_ulaw',
-        input_audio_transcription: { model: 'whisper-1' },
-        turn_detection: turnDetection,
+        audio: {
+          input: {
+            format: { type: 'audio/pcmu' },
+            turn_detection: turnDetection,
+            transcription: { model: 'whisper-1' },
+          },
+          output: {
+            format: { type: 'audio/pcmu' },
+            voice: agentConfig.voice,
+          },
+        },
         tools,
         tool_choice: tools.length > 0 ? 'auto' : 'none',
-        temperature: agentConfig.temperature ?? 0.7,
       },
     };
 

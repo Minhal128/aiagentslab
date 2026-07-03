@@ -351,20 +351,27 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
 
     const enhancedInstructions = agentConfig.systemPrompt + functionCallingRequirements;
 
-    // Flat format required by OpenAI Realtime API — nested audio.input/audio.output is ignored.
+    // GA Realtime API format: session.type is required, audio config is nested
+    // under audio.input/audio.output, and temperature is no longer supported.
     const sessionConfig = {
       type: 'session.update',
       session: {
-        modalities: ['text', 'audio'],
+        type: 'realtime',
+        output_modalities: ['audio'],
         instructions: enhancedInstructions,
-        voice: agentConfig.voice,
-        input_audio_format: 'pcm16',
-        output_audio_format: 'pcm16',
-        input_audio_transcription: { model: 'whisper-1' },
-        turn_detection: turnDetection,
+        audio: {
+          input: {
+            format: { type: 'audio/pcm', rate: this.OUTPUT_SAMPLE_RATE },
+            turn_detection: turnDetection,
+            transcription: { model: 'whisper-1' },
+          },
+          output: {
+            format: { type: 'audio/pcm', rate: this.OUTPUT_SAMPLE_RATE },
+            voice: agentConfig.voice,
+          },
+        },
         tools,
         tool_choice: tools.length > 0 ? 'auto' : 'none',
-        temperature: agentConfig.temperature ?? 0.7,
       },
     };
 
