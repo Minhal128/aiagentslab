@@ -94,6 +94,7 @@ export interface AudioBridgeSession {
   recordingStartTime: Date | null;
   recordingActive: boolean;
   callRecordId: string | null;
+  greetingGraceUntil: number;
 }
 
 /**
@@ -183,6 +184,7 @@ export class AudioBridgeService {
       recordingStartTime: null,
       recordingActive: false,
       callRecordId: params.callRecordId || null,
+      greetingGraceUntil: 0,
     };
 
     // Register tool handlers from agent config
@@ -481,6 +483,12 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
 
     logger.info(`Sending first message for ${callUuid}: "${text.substring(0, 50)}..."`, undefined, 'AudioBridge');
 
+    // ponytail: line-connect noise/click right at pickup can trip VAD's
+    // speech_started within milliseconds of the greeting starting, cancelling
+    // it before a single word plays. Give the greeting a short grace window
+    // where a false-positive barge-in is ignored instead of killing it.
+    session.greetingGraceUntil = Date.now() + 1500;
+
     // Use response.create with instructions to speak the exact greeting
     // This is the official way to have the agent say a specific first message
     // After speaking this greeting, the agent MUST wait for user input before responding again
@@ -585,6 +593,10 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
 
         case 'input_audio_buffer.speech_started':
           session.lastUserSpeechTime = Date.now();
+          if (Date.now() < session.greetingGraceUntil) {
+            logger.info('Ignored speech_started during greeting grace window (likely pickup noise)', undefined, 'AudioBridge');
+            break;
+          }
           logger.info('User started speaking (barge-in detected)', undefined, 'AudioBridge');
           // CRITICAL: Immediately cancel current response and clear audio buffer
           // This prevents the "rushing through" behavior when user interrupts
