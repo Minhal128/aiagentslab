@@ -313,6 +313,16 @@ export class OpenAIAgentFactory {
                 const parsed = new Date(raw);
                 if (!isNaN(parsed.getTime())) resolved = parsed;
               }
+              if (resolved && !/\b\d{4}\b/.test(raw)) {
+                // No explicit year in the caller's text — don't trust JS's guess for
+                // ambiguous "DD Month" input (it can silently land on a bogus year
+                // like 2001). Pin to this year, rolling to next year if already passed.
+                let withThisYear = new Date(today.getFullYear(), resolved.getMonth(), resolved.getDate());
+                if (withThisYear < today) {
+                  withThisYear = new Date(today.getFullYear() + 1, resolved.getMonth(), resolved.getDate());
+                }
+                resolved = withThisYear;
+              }
               if (resolved) {
                 const y = resolved.getFullYear();
                 const m = String(resolved.getMonth() + 1).padStart(2, '0');
@@ -619,6 +629,16 @@ export class OpenAIAgentFactory {
             if (!resolved) {
               const parsed = new Date(raw);
               if (!isNaN(parsed.getTime())) resolved = parsed;
+            }
+            if (resolved && !/\b\d{4}\b/.test(raw)) {
+              // No explicit year in the caller's text — don't trust JS's guess for
+              // ambiguous "DD Month" input (it can silently land on a bogus year
+              // like 2001). Pin to this year, rolling to next year if already passed.
+              let withThisYear = new Date(today.getFullYear(), resolved.getMonth(), resolved.getDate());
+              if (withThisYear < today) {
+                withThisYear = new Date(today.getFullYear() + 1, resolved.getMonth(), resolved.getDate());
+              }
+              resolved = withThisYear;
             }
             if (resolved) {
               const y = resolved.getFullYear();
