@@ -84,20 +84,21 @@ export class OpenAIAgentFactory {
    * else is affected.
    */
   static buildIndianPersona(voice?: string | null, language?: string | null): string {
+    // Hindi-first applies to the Indian voices (arjun/priya) and Hindi/Urdu.
+    // Other Indian languages rely on the per-language header in createAgentConfig,
+    // so we don't force Hindi on e.g. a Tamil or Telugu agent.
     const indianVoice = voice === 'arjun' || voice === 'priya';
-    const indianLangs = ['hi', 'ur', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'];
-    const indianLang = !!language && indianLangs.includes(language);
-    if (!indianVoice && !indianLang) return '';
+    const hindiLang = language === 'hi' || language === 'ur';
+    if (!indianVoice && !hindiLang) return '';
 
     const genderHint = voice === 'priya' ? ' You are a warm Indian woman.' : voice === 'arjun' ? ' You are a warm Indian man.' : '';
 
-    return `VOICE & ACCENT (critical — hold this for the ENTIRE call):
-- Speak with a natural, authentic Indian English accent, the way an educated Indian professional actually speaks on the phone. Not exaggerated, not cartoonish.
-- Keep Indian English rhythm and intonation consistent from the very first word. Do NOT drift into an American or British accent as the call goes on.${genderHint}
-- Sound like a real human: relaxed pace, contractions, short sentences. Never robotic, over-formal, or scripted.
-- Be warm, friendly and polite. Address people respectfully (e.g. "ji").
-- Use natural Indian conversational touches sparingly and only where a real person would ("haan", "achha", "ji", "no problem", "one second").
-- If the caller speaks Hindi/Urdu or mixes languages, reply in natural Hinglish — code-switch the way real bilingual Indians do. Never force pure English or pure Hindi.
+    return `VOICE, LANGUAGE & ACCENT (critical — hold this for the ENTIRE call):
+- Speak in natural, everyday Hindi by DEFAULT, from the very first word. This is a Hindi conversation, not an English one.${genderHint}
+- Talk the way real Indians actually speak on the phone: warm, relaxed Hindi with the occasional common English word only where it sounds natural (Hinglish). Never stiff, "textbook", or heavily Sanskritised Hindi.
+- Keep a genuine Indian accent and Hindi rhythm consistent for the ENTIRE call. Do NOT drift into English or an American accent.
+- Switch to English ONLY if the caller clearly prefers English. The moment they speak Hindi again, go back to Hindi.
+- Be warm, polite and human: short sentences, contractions, natural fillers ("haan ji", "achha", "theek hai", "ek second"). Never robotic, over-formal, or scripted.
 
 `;
   }
