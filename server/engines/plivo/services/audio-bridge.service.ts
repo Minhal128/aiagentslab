@@ -489,14 +489,19 @@ BACKGROUND NOISE: Ignore all background sound. Only respond to the primary calle
     // where a false-positive barge-in is ignored instead of killing it.
     session.greetingGraceUntil = Date.now() + 1500;
 
-    // Use response.create with instructions to speak the exact greeting
-    // This is the official way to have the agent say a specific first message
-    // After speaking this greeting, the agent MUST wait for user input before responding again
+    // Use response.create with instructions to speak the specific first message.
+    // When the Hindi persona is active, deliver the greeting IN Hindi (conveying
+    // meaning) instead of word-for-word, so a first message written in any
+    // language still opens the call in the agent's Hindi tone.
+    // ponytail: marker string must match buildIndianPersona()'s persona text.
+    const hindiPersona = (session.agentConfig.systemPrompt || '').includes('everyday Hindi by DEFAULT');
+    const instructions = hindiPersona
+      ? `IMPORTANT: Greet the caller now by conveying the following message in natural, everyday spoken Hindi (Hinglish is fine) — keep the meaning but say it in Hindi even if the text below is in English. Then STOP and WAIT for the user to respond. Do NOT add any follow-up questions or extra content. Message: "${text}"`
+      : `IMPORTANT: Say ONLY the following greeting message word-for-word, then STOP and WAIT for the user to respond. Do NOT add any follow-up questions or additional content. Just say this exact message and wait: "${text}"`;
+
     openaiWs.send(JSON.stringify({
       type: 'response.create',
-      response: {
-        instructions: `IMPORTANT: Say ONLY the following greeting message word-for-word, then STOP and WAIT for the user to respond. Do NOT add any follow-up questions or additional content. Just say this exact message and wait: "${text}"`,
-      },
+      response: { instructions },
     }));
   }
 
