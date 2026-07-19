@@ -75,6 +75,34 @@ export class OpenAIAgentFactory {
   }
 
   /**
+   * Build an Indian-English voice persona for the system prompt.
+   *
+   * OpenAI Realtime voices default to a neutral American accent and drift back
+   * to it mid-call — that drift is what makes the "arjun"/"priya" Indian voices
+   * sound fake. Injecting an explicit, detailed persona holds the accent far
+   * more consistently. Returns '' for non-Indian voices/languages so nothing
+   * else is affected.
+   */
+  static buildIndianPersona(voice?: string | null, language?: string | null): string {
+    const indianVoice = voice === 'arjun' || voice === 'priya';
+    const indianLangs = ['hi', 'ur', 'bn', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'pa'];
+    const indianLang = !!language && indianLangs.includes(language);
+    if (!indianVoice && !indianLang) return '';
+
+    const genderHint = voice === 'priya' ? ' You are a warm Indian woman.' : voice === 'arjun' ? ' You are a warm Indian man.' : '';
+
+    return `VOICE & ACCENT (critical — hold this for the ENTIRE call):
+- Speak with a natural, authentic Indian English accent, the way an educated Indian professional actually speaks on the phone. Not exaggerated, not cartoonish.
+- Keep Indian English rhythm and intonation consistent from the very first word. Do NOT drift into an American or British accent as the call goes on.${genderHint}
+- Sound like a real human: relaxed pace, contractions, short sentences. Never robotic, over-formal, or scripted.
+- Be warm, friendly and polite. Address people respectfully (e.g. "ji").
+- Use natural Indian conversational touches sparingly and only where a real person would ("haan", "achha", "ji", "no problem", "one second").
+- If the caller speaks Hindi/Urdu or mixes languages, reply in natural Hinglish — code-switch the way real bilingual Indians do. Never force pure English or pure Hindi.
+
+`;
+  }
+
+  /**
    * Validate and normalize model selection based on tier
    */
   static validateModel(model: string, tier: 'free' | 'pro' = 'free'): OpenAIRealtimeModel {
@@ -1815,6 +1843,7 @@ LANGUAGE DETECTION: You have automatic language detection enabled. Listen carefu
 
     const voice = this.validateVoice(agent.openaiVoice || 'alloy');
     const model = this.validateModel(agent.openaiModel || 'gpt-realtime-1.5', userTier);
+    const indianPersona = this.buildIndianPersona(agent.openaiVoice, agent.language);
 
     let config: AgentConfigWithContext;
 
@@ -1829,12 +1858,13 @@ LANGUAGE DETECTION: You have automatic language detection enabled. Listen carefu
         temperature: agent.temperature ?? 0.7,
         language: agent.language || 'en',
       });
+      if (indianPersona) config.systemPrompt = indianPersona + config.systemPrompt;
     } else {
       // Natural or incoming agents
       config = this.createAgentConfig({
         voice,
         model,
-        systemPrompt: agent.systemPrompt || 'You are a helpful AI assistant.',
+        systemPrompt: indianPersona + (agent.systemPrompt || 'You are a helpful AI assistant.'),
         firstMessage: agent.firstMessage || undefined,
         temperature: agent.temperature || 0.7,
         userTier,
